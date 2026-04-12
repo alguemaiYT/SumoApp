@@ -1,0 +1,17 @@
+{
+  "name": "sumoapp-robot-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local bridge between Robot Operations Hub (HTML) and ESP32 BluetoothSerial",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test bluetoothClient.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "bluetooth-serial-port": "^2.2.8"
+  }
+}

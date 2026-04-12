@@ -1,0 +1,8 @@
+{
+  "httpPort": 8787,
+  "deviceName": "Madinboo_BT",
+  "deviceAddress": "",
+  "pollIntervalMs": 500,
+  "reconnectBaseMs": 250,
+  "reconnectMaxMs": 8000
+}

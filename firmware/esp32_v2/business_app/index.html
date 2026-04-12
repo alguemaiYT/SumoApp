@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robot Operations Hub</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Robot Operations Hub</h1>
+      <p class="subtitle">Business dashboard for competition setup, telemetry, and safety control.</p>
+    </div>
+    <span class="pill" id="connection-status">Disconnected</span>
+  </header>
+
+  <nav class="action-bar" aria-label="Primary actions">
+    <button id="btn-connect" class="btn btn-primary">Connect</button>
+    <button id="btn-sync" class="btn">Sync Data</button>
+    <button id="btn-apply" class="btn">Apply Config</button>
+    <button id="btn-stop" class="btn btn-danger">Emergency Stop</button>
+  </nav>
+
+  <main class="layout">
+    <section class="card">
+      <h2>Match Setup</h2>
+      <div class="form-grid">
+        <label for="strategy-select">Strategy</label>
+        <select id="strategy-select">
+          <option value="1">Radar</option>
+          <option value="2">Cacador</option>
+          <option value="3">Firula</option>
+          <option value="4">Suicida</option>
+          <option value="5">Sovai</option>
+          <option value="6">Contorno</option>
+          <option value="7">Seg-linha</option>
+        </select>
+
+        <label for="input-vr">VR (straight speed)</label>
+        <input id="input-vr" type="number" min="0" max="255" value="180">
+
+        <label for="input-vg">VG (turn speed)</label>
+        <input id="input-vg" type="number" min="0" max="255" value="180">
+
+        <label for="input-hbe">HBE (evasion)</label>
+        <select id="input-hbe">
+          <option value="0">Off</option>
+          <option value="1">On</option>
+        </select>
+
+        <label for="input-lip">LIP threshold</label>
+        <input id="input-lip" type="number" min="-1000" max="1000" value="0">
+
+        <label for="input-lie">LIE threshold</label>
+        <input id="input-lie" type="number" min="-1000" max="1000" value="-1">
+      </div>
+
+      <div class="profile-row">
+        <input id="profile-name" type="text" placeholder="Profile name">
+        <button id="btn-save-profile" class="btn">Save Profile</button>
+      </div>
+      <div class="profile-row">
+        <select id="profile-select">
+          <option value="">Select profile</option>
+        </select>
+        <button id="btn-load-profile" class="btn">Load Profile</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Live Telemetry</h2>
+      <div class="telemetry-grid">
+        <article>
+          <h3>Battery</h3>
+          <p class="metric"><span id="telemetry-Vbat">--</span> V</p>
+        </article>
+        <article>
+          <h3>Drive Speeds</h3>
+          <p>VR: <span id="telemetry-velocreta">--</span></p>
+          <p>VG: <span id="telemetry-velocgiro">--</span></p>
+        </article>
+        <article>
+          <h3>Center Sensors</h3>
+          <p>SCD: <span id="telemetry-sen_centro_dir">--</span></p>
+          <p>SCE: <span id="telemetry-sen_centro_esq">--</span></p>
+        </article>
+        <article id="edge-sensors-card" data-risk="normal">
+          <h3>Edge Sensors</h3>
+          <p>LD: <span id="telemetry-sensorLD">--</span></p>
+          <p>LE: <span id="telemetry-sensorLE">--</span></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Safety Controls</h2>
+      <p>Use emergency stop for immediate motor halt (`PARADA`).</p>
+      <button id="btn-stop-secondary" class="btn btn-danger btn-large">STOP ROBOT</button>
+      <button id="btn-rearm" class="btn btn-primary btn-large">Re-arm Controls</button>
+    </section>
+
+    <section class="card">
+      <h2>Session Log</h2>
+      <button id="btn-export-log" class="btn">Export CSV</button>
+      <ul id="session-log" class="log-list">
+        <li>System ready.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="./js/protocol.js"></script>
+  <script src="./js/ui.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
