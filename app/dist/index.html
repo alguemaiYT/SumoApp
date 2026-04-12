@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080b0f">
+<title>ROBOCTL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-BbvRvnhZ.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/conversion-DafstL-R.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-B6KAr7CH.css">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">ROBO<span>CTL</span></div>
+  <div class="tb-mid" id="ptitle">Dashboard</div>
+  <div id="conn-btn-top" id="toggleConnBtn">
+    <div class="bt-dot"></div>
+    <span id="conn-lbl">CONECTAR</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dash">
+    <button id="emrg">
+      <span style="font-size:28px;">⚡</span>
+      <span>EMERGÊNCIA</span>
+    </button>
+
+    <div class="card">
+      <div class="card-title">Sensores Frontais</div>
+      <div class="s-grid-4">
+        <div class="stile" id="t-SE"><div class="sk">SE</div><div class="sv" id="v-SE">—</div><div class="ss">Esquerda</div><div class="sbar"><div class="sbar-f" id="b-SE"></div></div></div>
+        <div class="stile" id="t-SCE"><div class="sk">SCE</div><div class="sv" id="v-SCE">—</div><div class="ss">C. Esq.</div><div class="sbar"><div class="sbar-f" id="b-SCE"></div></div></div>
+        <div class="stile" id="t-SCD"><div class="sk">SCD</div><div class="sv" id="v-SCD">—</div><div class="ss">C. Dir.</div><div class="sbar"><div class="sbar-f" id="b-SCD"></div></div></div>
+        <div class="stile" id="t-SD"><div class="sk">SD</div><div class="sv" id="v-SD">—</div><div class="ss">Direita</div><div class="sbar"><div class="sbar-f" id="b-SD"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Sensores de Linha</div>
+      <div class="s-grid-2">
+        <div class="stile" id="t-LE"><div class="sk">LE</div><div class="sv" id="v-LE">—</div><div class="ss">Linha Esq.</div><div class="sbar"><div class="sbar-f" id="b-LE"></div></div></div>
+        <div class="stile" id="t-LD"><div class="sk">LD</div><div class="sv" id="v-LD">—</div><div class="ss">Linha Dir.</div><div class="sbar"><div class="sbar-f" id="b-LD"></div></div></div>
+      </div>
+    </div>
+
+    <div class="upd-row">
+      <button class="btn primary sm" id="reqDataBtn">⟳ ATUALIZAR</button>
+      <div class="upd-ts" id="upd-ts">—</div>
+    </div>
+  </div>
+
+  <!-- PARÂMETROS -->
+  <div class="page" id="page-params">
+
+    <div class="card">
+      <div class="card-title">Estratégia</div>
+      <div class="fg">
+        <label>Modo de combate</label>
+        <select id="strat-sel">
+          <option value="">— Selecione —</option>
+          <option value="1">Radar</option>
+          <option value="2">Caçador</option>
+          <option value="3">Firula</option>
+          <option value="4">Suicida</option>
+          <option value="5">Só Vai</option>
+          <option value="6">Contorno</option>
+          <option value="7">Seg Linha</option>
+        </select>
+      </div>
+      <div class="sf pending" id="sf">
+        <span class="sf-ico">◌</span>
+        <span class="sf-txt" id="sf-msg">Selecione uma estratégia</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn sm" id="chkStratBtn">✓ VERIFICAR</button>
+        <button class="btn primary sm" id="strat-send" disabled>▶ ENVIAR</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Velocidades</div>
+      <div class="sw">
+        <div class="sh">
+          <label style="margin:0">VR · Reta</label>
+          <div style="display:flex;align-items:baseline;gap:5px;">
+            <span class="sval" id="vr-v">2048</span><span class="smax">/ 4096</span>
+          </div>
+        </div>
+        <input type="range" min="0" max="4096" value="2048" id="vr">
+      </div>
+      <div class="sw">
+        <div class="sh">
+          <label style="margin:0">VG · Giro</label>
+          <div style="display:flex;align-items:baseline;gap:5px;">
+            <span class="sval" id="vg-v">2048</span><span class="smax">/ 4096</span>
+          </div>
+        </div>
+        <input type="range" min="0" max="4096" value="2048" id="vg">
+      </div>
+      <button class="btn primary" id="sendSpeedsBtn">▶ ENVIAR VELOCIDADES</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Limiares</div>
+      <div class="fg">
+        <label>LIP · Limiar Parado</label>
+        <input type="number" id="lip" value="500" min="0" max="4095" inputmode="numeric">
+      </div>
+      <div class="fg">
+        <label>LIE · Limiar Empurrado</label>
+        <input type="number" id="lie" value="800" min="0" max="4095" inputmode="numeric">
+      </div>
+      <button class="btn primary" id="sendThreshBtn">▶ ENVIAR LIMIARES</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Evasão (HBE)</div>
+      <div class="trow" style="padding-top:4px;">
+        <div class="trow-l">
+          <div class="trow-name">Esquiva Automática</div>
+          <div class="trow-sub">Habilita comportamento de evasão</div>
+        </div>
+        <label class="tog">
+          <input type="checkbox" id="hbe">
+          <span class="tsl"></span>
+        </label>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn primary" id="sendEvasionBtn">▶ ENVIAR EVASÃO</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMINAL -->
+  <div class="page" id="page-terminal">
+    <div class="card">
+      <div class="card-title">Comando Bruto</div>
+      <div class="fg">
+        <label>Comando</label>
+        <input type="text" id="raw-in" placeholder="ex: EST,1*"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <button class="btn primary" id="sendRawBtn">▶ ENVIAR COMANDO</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Log</div>
+      <div class="chips" id="logChips">
+        <div class="chip on TX"  data-t="TX">TX</div>
+        <div class="chip on RX"  data-t="RX">RX</div>
+        <div class="chip on ERR" data-t="ERR">ERR</div>
+        <div class="chip on SYS" data-t="SYS">SYS</div>
+        <div class="chip clr" id="clearLogBtn">✕ LIMPAR</div>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <!-- I/O -->
+  <div class="page" id="page-io">
+    <div class="io-card">
+      <div class="card-title" style="margin-bottom:8px;">Exportar</div>
+      <div class="io-desc">Exporta todos os parâmetros atuais como arquivo JSON.</div>
+      <button class="btn primary" id="exportCfgBtn">⬇ EXPORTAR JSON</button>
+    </div>
+    <div class="io-card">
+      <div class="card-title" style="margin-bottom:8px;">Importar</div>
+      <div class="io-desc">Importa parâmetros de um JSON exportado anteriormente.</div>
+      <input type="file" id="imp-file" accept=".json" style="display:none">
+      <button class="btn warn" id="importCfgBtn">⬆ IMPORTAR JSON</button>
+      <div id="imp-msg" style="font-family:var(--mono);font-size:11px;color:var(--text3);"></div>
+    </div>
+    <div class="io-card">
+      <div class="card-title" style="margin-bottom:8px;">Configuração Atual</div>
+      <pre id="cfg-pre">—</pre>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<div id="botnav">
+  <div class="nitem active" data-pg="dash"><span class="nico">◈</span><span class="nlbl">Dashboard</span></div>
+  <div class="nitem" data-pg="params"><span class="nico">⊞</span><span class="nlbl">Params</span></div>
+  <div class="nitem" data-pg="terminal"><span class="nico">▶</span><span class="nlbl">Terminal</span></div>
+  <div class="nitem" data-pg="io"><span class="nico">⇅</span><span class="nlbl">I/O</span></div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="ov-wrap">
+    <div class="ov-ring" id="ov-ring">🦷</div>
+    <div class="ov-title">BLUETOOTH</div>
+    <div class="ov-sub">Conecte-se ao ESP32 via Bluetooth LE.<br>Mantenha o robô ligado e próximo.</div>
+    <div class="ov-msg" id="ov-msg">Aguardando ação...</div>
+    <button class="btn primary" id="ov-btn" style="min-height:56px;font-size:14px;">◉ CONECTAR AO ESP32</button>
+    <span class="ov-skip" id="dismissOverlay">Usar em modo offline</span>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+</body>
+</html>
