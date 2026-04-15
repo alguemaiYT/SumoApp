@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#080c14"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<title>RoboCtrl Sumô — ESP32</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:      #080c14;
+    --surface: #0f1520;
+    --panel:   #131c2e;
+    --border:  #1e2d4a;
+    --accent:  #00c8f0;
+    --accent2: #0087b3;
+    --amber:   #ffaa00;
+    --danger:  #ff3b3b;
+    --success: #00e87a;
+    --text:    #ccd9ee;
+    --muted:   #566a8a;
+    --mono:    'IBM Plex Mono', monospace;
+    --sans:    'Rajdhani', sans-serif;
+    --header-h: 56px;
+    --nav-h:    64px;
+    --radius:   10px;
+    --glow:     0 0 18px rgba(0,200,240,0.18);
+    --glow-sm:  0 0 8px rgba(0,200,240,0.22);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* ── HEADER ──────────────────────────────── */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 34px; height: 34px;
+    border: 1.5px solid var(--accent);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    box-shadow: var(--glow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .logo-icon::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,200,240,0.12), transparent);
+  }
+  .logo-icon svg { width: 18px; height: 18px; fill: var(--accent); }
+  .logo-text { font-size: 18px; font-weight: 700; letter-spacing: 2px; color: #fff; }
+  .logo-text span { color: var(--accent); }
+
+  .conn-area { display: flex; align-items: center; gap: 8px; }
+  .conn-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s, box-shadow .3s;
+  }
+  .conn-dot.active {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2s infinite;
+  }
+  .conn-dot.reconnecting { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .conn-dot.error { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; } 50% { opacity: .4; }
+  }
+  .conn-label { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .btn-conn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 600;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: border-color .2s, color .2s, background .2s;
+    letter-spacing: .5px;
+  }
+  .btn-conn:active { background: var(--border); }
+  .btn-conn.connected { border-color: var(--danger); color: var(--danger); }
+
+  /* ── MAIN SCROLL AREA ───────────────────── */
+  .main {
+    position: fixed;
+    top: var(--header-h);
+    bottom: var(--nav-h);
+    left: 0; right: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    touch-action: pan-y;
+  }
+  .page {
+    display: none;
+    padding: 14px 14px 80px;
+    min-height: 100%;
+  }
+  .page.active { display: block; }
+
+  /* ── BOTTOM NAV ──────────────────────────── */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 100;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; cursor: pointer; border: none; background: transparent;
+    color: var(--muted); font-family: var(--sans); font-size: 10px; font-weight: 600;
+    letter-spacing: .5px; transition: color .2s, opacity .2s; padding: 0;
+    opacity: .72;
+  }
+  .nav-item svg { width: 22px; height: 22px; transition: filter .2s; fill: currentColor; }
+  .nav-item.active { opacity: 1; color: var(--accent); }
+  .nav-item.active svg { filter: drop-shadow(0 0 4px var(--accent)); }
+
+  /* ── PANELS ─────────────────────────────── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── BUTTONS ────────────────────────────── */
+  .btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+    text-align: center;
+  }
+  .btn:active { transform: scale(.98); opacity: .8; }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    box-shadow: var(--glow-sm);
+  }
+  .btn.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(255,59,59,0.3);
+    font-size: 16px;
+    padding: 16px 24px;
+  }
+  .btn.success {
+    background: var(--success);
+    border-color: var(--success);
+    color: var(--bg);
+  }
+  .btn:disabled {
+    opacity: .3;
+    cursor: not-allowed;
+  }
+
+  /* ── SLIDERS ────────────────────────────── */
+  .slider-group {
+    margin-bottom: 18px;
+  }
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .slider-label strong {
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  .slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface);
+    outline: none;
+    -webkit-appearance: none;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: var(--glow-sm);
+  }
+  .slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: var(--glow-sm);
+  }
+
+  /* ── RADIO BUTTONS ──────────────────────── */
+  .radio-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .radio-btn {
+    position: relative;
+  }
+  .radio-btn input {
+    position: absolute;
+    opacity: 0;
+  }
+  .radio-btn label {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .radio-btn input:checked + label {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    box-shadow: var(--glow-sm);
+  }
+
+  /* ── TOGGLE SWITCH ──────────────────────── */
+  .toggle-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .toggle-label {
+    font-size: 14px;
+    color: var(--text);
+  }
+  .toggle {
+    position: relative;
+    width: 50px;
+    height: 26px;
+  }
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    transition: .3s;
+  }
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: .3s;
+  }
+  .toggle input:checked + .toggle-slider {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .toggle input:checked + .toggle-slider:before {
+    background: var(--bg);
+    transform: translateX(24px);
+  }
+
+  /* ── INDICATORS ─────────────────────────── */
+  .indicator-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .indicator {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+  }
+  .indicator-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .indicator-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin: 0 auto;
+    transition: all .3s;
+  }
+  .indicator-dot.active {
+    background: var(--success);
+    box-shadow: 0 0 12px var(--success);
+  }
+
+  /* ── BATTERY GAUGE ──────────────────────── */
+  .battery-gauge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .battery-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--success);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .battery-value.warning { color: var(--amber); }
+  .battery-value.critical { color: var(--danger); }
+  .battery-bar {
+    height: 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .battery-fill {
+    height: 100%;
+    background: var(--success);
+    transition: width .3s, background .3s;
+    border-radius: 6px;
+  }
+  .battery-fill.warning { background: var(--amber); }
+  .battery-fill.critical { background: var(--danger); }
+
+  /* ── BAR CHART ──────────────────────────── */
+  .bar-chart {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    height: 120px;
+    margin-bottom: 12px;
+  }
+  .bar-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .bar {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    position: relative;
+    transition: height .3s;
+  }
+  .bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--accent);
+    border-radius: 6px 6px 0 0;
+    transition: height .3s;
+  }
+  .bar-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .bar-value {
+    font-size: 12px;
+    color: var(--accent);
+    font-family: var(--mono);
+  }
+
+  /* ── ALERTS ─────────────────────────────── */
+  .alert {
+    position: fixed;
+    top: 72px;
+    left: 16px;
+    right: 16px;
+    background: var(--danger);
+    color: #fff;
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    z-index: 200;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .alert.show {
+    display: block;
+    animation: slideDown .3s;
+  }
+  @keyframes slideDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* ── MANUAL CONTROLS ────────────────────── */
+  .d-pad {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 8px;
+    max-width: 240px;
+    margin: 16px auto;
+  }
+  .d-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--accent);
+  }
+  .d-btn:active {
+    background: var(--accent);
+    color: var(--bg);
+    transform: scale(.95);
+  }
+  .d-btn:disabled {
+    opacity: .2;
+    cursor: not-allowed;
+  }
+  .d-btn-up { grid-column: 2; grid-row: 1; }
+  .d-btn-left { grid-column: 1; grid-row: 2; }
+  .d-btn-right { grid-column: 3; grid-row: 2; }
+  .d-btn-down { grid-column: 2; grid-row: 3; }
+
+  /* ── PROFILE SECTION ────────────────────── */
+  .profile-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 12px;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  select:focus { outline: 2px solid var(--accent); }
+
+  /* ── LOG VIEWER ─────────────────────────── */
+  .log-viewer {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .log-entry {
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+
+  /* ── STATUS BADGE ───────────────────────── */
+  .status-badge {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .status-badge.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
+  /* ── RESPONSIVE ─────────────────────────── */
+  @media (min-width: 768px) {
+    .main { max-width: 1024px; margin: 0 auto; }
+    .d-pad { max-width: 280px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+      </svg>
+    </div>
+    <div class="logo-text">ROBO<span>CTRL</span></div>
+  </div>
+  <div class="conn-area">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-label" id="conn-label">Desconectado</span>
+    <button class="btn-conn" id="btn-conn">Conectar</button>
+  </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+  
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 1: CONTROLE -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="page active" id="page-control">
+    
+    <!-- Emergency Stop -->
+    <button class="btn danger" id="btn-emergency" style="width: 100%; margin-bottom: 16px;">
+      ⚠️ PARADA DE EMERGÊNCIA
+    </button>
+
+    <!-- Strategy Selection -->
+    <div class="panel">
+      <div class="panel-title">Estratégia Automática</div>
+      <div class="radio-group">
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="1" id="strat-1">
+          <label for="strat-1">1 - Radar</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="2" id="strat-2">
+          <label for="strat-2">2 - Hunter</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="3" id="strat-3">
+          <label for="strat-3">3 - Firula</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="4" id="strat-4">
+          <label for="strat-4">4 - Suicida</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="5" id="strat-5">
+          <label for="strat-5">5 - Sovai</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="6" id="strat-6">
+          <label for="strat-6">6 - Contorno</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="strategy" value="7" id="strat-7">
+          <label for="strat-7">7 - Seg. Linha</label>
+        </div>
+      </div>
+      <div class="status-badge" id="strategy-status">Nenhuma selecionada</div>
+    </div>
+
+    <!-- Impact Evasion Toggle -->
+    <div class="panel">
+      <div class="toggle-group">
+        <span class="toggle-label">Evasão por Impacto (HBE)</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-hbe">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Manual Test Mode -->
+    <div class="panel">
+      <div class="panel-title">Modo Teste Manual</div>
+      <div class="toggle-group" style="margin-bottom: 16px;">
+        <span class="toggle-label">Ativar Modo Teste</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-manual">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <div id="manual-controls" style="display: none;">
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Velocidade Teste</span>
+            <strong id="manual-speed-val">128</strong>
+          </div>
+          <input type="range" class="slider" id="slider-manual-speed" min="0" max="255" value="128">
+        </div>
+        
+        <div class="d-pad">
+          <button class="d-btn d-btn-up" id="btn-forward">▲</button>
+          <button class="d-btn d-btn-left" id="btn-left">◄</button>
+          <button class="d-btn" style="visibility: hidden;"></button>
+          <button class="d-btn d-btn-right" id="btn-right">►</button>
+          <button class="d-btn d-btn-down" id="btn-reverse">▼</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 2: CONFIG -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-config">
+    
+    <!-- Parameter Sliders -->
+    <div class="panel">
+      <div class="panel-title">Parâmetros de Combate</div>
+      
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>VR (Velocidade Reta)</span>
+          <strong id="vr-val">0</strong>
+        </div>
+        <input type="range" class="slider" id="slider-vr" min="0" max="255" value="0">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>VG (Velocidade Giro)</span>
+          <strong id="vg-val">0</strong>
+        </div>
+        <input type="range" class="slider" id="slider-vg" min="0" max="255" value="0">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>LIP (Limiar Parado)</span>
+          <strong id="lip-val">10</strong>
+        </div>
+        <input type="range" class="slider" id="slider-lip" min="0" max="100" value="10">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>LIE (Limiar Empurrão)</span>
+          <strong id="lie-val">-25</strong>
+        </div>
+        <input type="range" class="slider" id="slider-lie" min="-100" max="0" value="-25">
+      </div>
+    </div>
+
+    <!-- Calibration -->
+    <div class="panel">
+      <div class="panel-title">Calibração IMU</div>
+      <button class="btn primary" id="btn-calibrate" style="width: 100%;">
+        Calibrar Acelerômetro/Giroscópio
+      </button>
+    </div>
+
+    <!-- Profile Management -->
+    <div class="panel">
+      <div class="panel-title">Perfis Salvos</div>
+      <select id="profile-select">
+        <option value="">Selecione um perfil...</option>
+        <option value="profile-1">Perfil 1</option>
+        <option value="profile-2">Perfil 2</option>
+        <option value="profile-3">Perfil 3</option>
+        <option value="profile-4">Perfil 4</option>
+        <option value="profile-5">Perfil 5</option>
+      </select>
+      <div class="profile-actions">
+        <button class="btn" id="btn-save-profile">Salvar</button>
+        <button class="btn" id="btn-load-profile">Carregar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 3: TELEMETRIA -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-telemetry">
+    
+    <!-- Battery -->
+    <div class="battery-gauge">
+      <div class="battery-value" id="battery-value">--.- V</div>
+      <div class="battery-bar">
+        <div class="battery-fill" id="battery-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Digital Sensors (Opponent Detection) -->
+    <div class="panel">
+      <div class="panel-title">Sensores de Oponente (Digital)</div>
+      <div class="indicator-row">
+        <div class="indicator">
+          <div class="indicator-label">Esquerda</div>
+          <div class="indicator-dot" id="sensor-esq"></div>
+        </div>
+        <div class="indicator">
+          <div class="indicator-label">Centro Esq</div>
+          <div class="indicator-dot" id="sensor-centro-esq"></div>
+        </div>
+        <div class="indicator">
+          <div class="indicator-label">Centro Dir</div>
+          <div class="indicator-dot" id="sensor-centro-dir"></div>
+        </div>
+        <div class="indicator">
+          <div class="indicator-label">Direita</div>
+          <div class="indicator-dot" id="sensor-dir"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Sensors -->
+    <div class="panel">
+      <div class="panel-title">Sensores de Linha (Analógicos)</div>
+      <div class="bar-chart">
+        <div class="bar-item">
+          <div class="bar" style="height: 100%;">
+            <div class="bar-fill" id="sensor-ld-fill" style="height: 0%;"></div>
+          </div>
+          <div class="bar-label">Esquerda</div>
+          <div class="bar-value" id="sensor-ld-val">0</div>
+        </div>
+        <div class="bar-item">
+          <div class="bar" style="height: 100%;">
+            <div class="bar-fill" id="sensor-le-fill" style="height: 0%;"></div>
+          </div>
+          <div class="bar-label">Direita</div>
+          <div class="bar-value" id="sensor-le-val">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry Info -->
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); font-family: var(--mono);">
+        <span>Última atualização:</span>
+        <span id="telemetry-timestamp">--:--:--</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 4: DIAGNÓSTICO -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-diagnostic">
+    
+    <!-- Motor Tests -->
+    <div class="panel">
+      <div class="panel-title">Teste de Motores</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+        <button class="btn" id="btn-test-motor-dir-fwd">Motor Dir →</button>
+        <button class="btn" id="btn-test-motor-dir-rev">Motor Dir ←</button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="btn" id="btn-test-motor-esq-fwd">Motor Esq →</button>
+        <button class="btn" id="btn-test-motor-esq-rev">Motor Esq ←</button>
+      </div>
+    </div>
+
+    <!-- Sensor Tests -->
+    <div class="panel">
+      <div class="panel-title">Teste de Sensores</div>
+      <button class="btn" id="btn-read-sensors" style="width: 100%; margin-bottom: 8px;">
+        Ler Todos os Sensores
+      </button>
+      <div id="sensor-readings" style="font-family: var(--mono); font-size: 12px; color: var(--muted);"></div>
+    </div>
+
+    <!-- LED Tests -->
+    <div class="panel">
+      <div class="panel-title">Teste de LEDs</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="btn" id="btn-led1-on">LED1 ON</button>
+        <button class="btn" id="btn-led1-off">LED1 OFF</button>
+        <button class="btn" id="btn-led2-on">LED2 ON</button>
+        <button class="btn" id="btn-led2-off">LED2 OFF</button>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="panel">
+      <div class="panel-title">Log de Eventos</div>
+      <div class="log-viewer" id="log-viewer">
+        <div class="log-entry">[Sistema] Aguardando conexão...</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="btn" id="btn-export-log">Exportar Log</button>
+        <button class="btn" id="btn-clear-log">Limpar Log</button>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- BOTTOM NAVIGATION -->
+<nav class="nav">
+  <button class="nav-item active" data-page="control">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span>CONTROLE</span>
+  </button>
+  <button class="nav-item" data-page="config">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+    </svg>
+    <span>CONFIG</span>
+  </button>
+  <button class="nav-item" data-page="telemetry">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/>
+    </svg>
+    <span>TELEMETRIA</span>
+  </button>
+  <button class="nav-item" data-page="diagnostic">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/>
+    </svg>
+    <span>DIAGNÓSTICO</span>
+  </button>
+</nav>
+
+<!-- ALERT -->
+<div class="alert" id="alert"></div>
+
+<script src="../app.js"></script>
+</body>
+</html>
