@@ -1,0 +1,1 @@
+- Re-fatoração do app para o Sumô Auto (Em Produção)
