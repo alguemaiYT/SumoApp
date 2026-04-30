@@ -127,7 +127,7 @@ void loop() {
 //frente(200); delay(1000); parado(); delay(1000);
 //re(200); delay(1000); parado(); delay(1000);
 //direita(200); delay(1000); parado(); delay(1000);
-//esquerda(200); delay(1000); parado(); delay(1000);
+//esquerda(200); delay(1000); parado(); delay(1000);x
 Le_Sensores();
 le_stop();
 

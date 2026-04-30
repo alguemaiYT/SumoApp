@@ -78,3 +78,17 @@ void evasao() {
   parado();
   delay(50);
 }
+
+void enviarNomesEstrategias() {
+  // Formato: STR:ID1=Nome1,ID2=Nome2...*
+  String msg = "STR:";
+  msg += "1=Radar,";
+  msg += "2=Cacador,";
+  msg += "3=Firula,";
+  msg += "4=Suicida,";
+  msg += "5=So Vai,";
+  msg += "6=Contorno,";
+  msg += "7=Seg. Linha";
+  msg += "*";
+  SerialBT.println(msg);
+}

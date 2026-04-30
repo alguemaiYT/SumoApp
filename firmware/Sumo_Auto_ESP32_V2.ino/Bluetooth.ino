@@ -41,6 +41,10 @@ void Bluetooth(){
       if (comando == "PARADA"){
       parado();} 
 
+     if (comando == "LISTA"){
+      enviarNomesEstrategias();
+     }
+
      if (comando == "dados"){ 
   //    Serial.println("enviando dados");
      Le_Sensores();
