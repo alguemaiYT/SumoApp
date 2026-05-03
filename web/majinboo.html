@@ -48,12 +48,15 @@
       html,
       body {
         height: 100%;
+        width: 100%;
         overflow: hidden;
         background: var(--bg);
         color: var(--text);
         font-family: var(--font-body);
         font-size: 16px;
         overscroll-behavior: none;
+        transform: scale(0.95);
+        transform-origin: top center;
       }
       button {
         font-family: inherit;
@@ -108,7 +111,7 @@
         background: radial-gradient(
           circle,
           rgba(245, 197, 24, 0.12) 0%,
-          transparent 70%
+          transparent 005%
         );
         top: 50%;
         left: 50%;
@@ -116,7 +119,7 @@
         pointer-events: none;
       }
       .logo-wrap {
-        margin-bottom: 30px;
+        margin-bottom: 40px;
         text-align: center;
       }
       .logo-wrap img {
