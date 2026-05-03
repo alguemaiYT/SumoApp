@@ -4,6 +4,9 @@ import { StatusBar } from '@capacitor/status-bar';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { bluetoothAdapter } from './bluetooth-adapter';
 
+// Expose to global scope for HTML onclick handlers
+(window as any).bluetoothAdapter = bluetoothAdapter;
+
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     // Initialize status bar
