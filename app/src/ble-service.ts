@@ -87,10 +87,11 @@ export class BLEService {
   private async stopScan() {
     try {
       await BleClient.stopLEScan();
-      this.scanInProgress = false;
-      this.emit('scanningState', { scanning: false });
     } catch (err) {
       console.error('Stop scan error:', err);
+    } finally {
+      this.scanInProgress = false;
+      this.emit('scanningState', { scanning: false });
     }
   }
 
@@ -124,6 +125,13 @@ export class BLEService {
     if (!this.connectedDevice) return;
 
     try {
+      // Stop notifications before disconnecting
+      await BleClient.stopNotifications(
+        this.connectedDevice.deviceId,
+        this.SERVICE_UUID,
+        this.RX_CHAR
+      );
+      
       await BleClient.disconnect(this.connectedDevice.deviceId);
       this.isConnected = false;
       this.emit('disconnected', {});
