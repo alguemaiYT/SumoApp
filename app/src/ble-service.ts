@@ -133,10 +133,12 @@ export class BLEService {
       );
       
       await BleClient.disconnect(this.connectedDevice.deviceId);
-      this.isConnected = false;
-      this.emit('disconnected', {});
     } catch (err) {
       console.error('Disconnect error:', err);
+    } finally {
+      this.isConnected = false;
+      this.connectedDevice = null;
+      this.emit('disconnected', {});
     }
   }
 
