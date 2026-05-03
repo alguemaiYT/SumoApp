@@ -1,0 +1,66 @@
+plugins {
+  id 'com.android.application'
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+android {
+  compileSdk rootProject.ext.compileSdkVersion
+  namespace "com.dragonbotz.sumoapp"
+
+  defaultConfig {
+    applicationId "com.dragonbotz.sumoapp"
+    minSdk rootProject.ext.minSdkVersion
+    targetSdk rootProject.ext.targetSdkVersion
+    versionCode 1
+    versionName "2.0.0"
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  buildTypes {
+    release {
+      debuggable false
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }
+    debug {
+      debuggable true
+      minifyEnabled false
+    }
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  buildFeatures {
+    viewBinding false
+  }
+}
+
+dependencies {
+  // Capacitor Core (local module)
+  implementation project(':capacitor-android')
+  implementation project(':capacitor-app')
+  implementation project(':capacitor-haptics')
+  implementation project(':capacitor-preferences')
+  implementation project(':capacitor-splash-screen')
+  implementation project(':capacitor-status-bar')
+
+  // AndroidX
+  implementation 'androidx.appcompat:appcompat:1.6.1'
+  implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+  implementation 'androidx.core:core-splashscreen:1.0.1'
+  implementation 'com.google.android.material:material:1.10.0'
+
+  // Testing
+  testImplementation 'junit:junit:4.13.2'
+  androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+  androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+apply from: 'capacitor.build.gradle'

@@ -1,0 +1,31 @@
+{
+  "name": "sumoapp",
+  "version": "2.0.0",
+  "description": "SumoBot control application with Capacitor",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "cap:add:android": "cap add android",
+    "cap:sync:android": "cap sync android",
+    "cap:open:android": "cap open android",
+    "cap:build:android": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
+    "cap:run:android": "npm run build && cap sync android && cap run android",
+    "cap:copy": "cap copy"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/app": "^5.0.8",
+    "@capacitor/core": "^5.7.8",
+    "@capacitor/haptics": "^5.0.8",
+    "@capacitor/preferences": "^5.0.8",
+    "@capacitor/splash-screen": "^5.0.8",
+    "@capacitor/status-bar": "^5.0.8"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^5.5.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
+  }
+}
