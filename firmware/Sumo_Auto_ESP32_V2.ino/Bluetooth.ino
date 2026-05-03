@@ -45,8 +45,20 @@ void Bluetooth(){
       enviarNomesEstrategias();
      }
 
+      if (comando == "DEBUG"){
+       flagDebug = (value == 1);
+     }
+
      if (comando == "dados"){ 
-  //    Serial.println("enviando dados");
+      enviarDadosDebug();
+     }
+    
+          palavra = "";
+   }
+  } 
+}
+
+void enviarDadosDebug() {
      Le_Sensores();
      SerialBT.print(velocreta);
      SerialBT.print("|");
@@ -71,23 +83,7 @@ void Bluetooth(){
      SerialBT.print(sensorLD);
      SerialBT.print("|");
      SerialBT.println(sensorLE);
-       
-//     Serial.println(HBEvasao);
-   Serial.print("HBEvasao=");
+     
+    Serial.print("HBEvasao=");
     Serial.print(HBEvasao);
-//     Serial.print("  sensorLE=");
-//     Serial.print(sensorLE);
-//     Serial.print("  SD=");
-//     Serial.print(sen_dir);
-//     Serial.print("  SCD=");
-//     Serial.print(sen_centro_dir);
-//     Serial.print("  SCE=");
-//     Serial.print(sen_centro_esq);
-//     Serial.print("  SE=");
-//     Serial.println(sen_esq);
-      }
-    
-          palavra = "";
-   }
-  } 
 }

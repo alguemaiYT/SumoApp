@@ -45,6 +45,7 @@ int velocreta;
 int velocgiro;
 int terezo = 0;
 bool HBEvasao = LOW;
+bool flagDebug = false;
 unsigned long ultimaVerificacao = 0;
 const unsigned long intervaloVerificacao = 500; // ms
 float limiarParado = 0.1;  // m/s² (quanto menor, mais sensível)

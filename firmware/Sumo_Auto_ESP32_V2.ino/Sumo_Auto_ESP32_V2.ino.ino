@@ -128,6 +128,16 @@ void loop() {
 //re(200); delay(1000); parado(); delay(1000);
 //direita(200); delay(1000); parado(); delay(1000);
 //esquerda(200); delay(1000); parado(); delay(1000);x
+Bluetooth();
+
+if (flagDebug) {
+  static unsigned long ultimaVerificacaoDebug = 0;
+  if (millis() - ultimaVerificacaoDebug > 500) {
+      ultimaVerificacaoDebug = millis();
+      enviarDadosDebug();
+  }
+}
+
 Le_Sensores();
 le_stop();
 
