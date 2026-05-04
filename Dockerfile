@@ -1,7 +1,7 @@
 # Docker-based development environment for SumoApp
 # Includes: Node.js, Java 17, Android SDK, and arduino-cli
 
-FROM ubuntu:22.04
+FROM debian:stable-slim
 
 # Avoid interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3 \
     wget \
+    iputils-ping \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20
