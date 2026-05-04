@@ -1,0 +1,19 @@
+{
+  "name": "SumoApp Workspace",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "ms-vscode.cpptools",
+        "vsciot-vscode.vscode-arduino"
+      ]
+    }
+  },
+  "remoteUser": "root"
+}
