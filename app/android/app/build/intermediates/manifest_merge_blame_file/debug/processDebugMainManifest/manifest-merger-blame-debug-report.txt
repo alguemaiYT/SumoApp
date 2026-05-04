@@ -1,0 +1,173 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.booctrl.app"
+4    android:versionCode="1"
+5    android:versionName="2.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="34" />
+10
+11    <!-- Legacy Bluetooth permissions for Android 11 and below -->
+12    <uses-permission
+12-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:5:5-95
+13        android:name="android.permission.BLUETOOTH"
+13-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:5:22-65
+14        android:maxSdkVersion="30" />
+14-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:5:66-92
+15    <uses-permission
+15-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:6:5-101
+16        android:name="android.permission.BLUETOOTH_ADMIN"
+16-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:6:22-71
+17        android:maxSdkVersion="30" />
+17-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:6:72-98
+18
+19    <!-- Bluetooth permissions for Android 12+ -->
+20    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+20-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:9:5-73
+20-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:9:22-70
+21    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+21-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:10:5-76
+21-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:10:22-73
+22    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+22-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:11:5-78
+22-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:11:22-75
+23
+24    <!-- Location permissions (required for Bluetooth discovery on all versions) -->
+25    <!--
+26         On Android 12+, scanning might not strictly need location if flags are used,
+27         but for universal compatibility with standard discovery, we keep it.
+28    -->
+29    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+29-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:16:5-79
+29-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:16:22-76
+30    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+30-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:17:5-81
+30-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:17:22-78
+31
+32    <!-- Other permissions -->
+33    <uses-permission android:name="android.permission.INTERNET" />
+33-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:20:5-67
+33-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:20:22-64
+34    <uses-permission android:name="android.permission.VIBRATE" />
+34-->[:capacitor-haptics] /home/kali/Repos/SumoApp/app/node_modules/@capacitor/haptics/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:7:5-66
+34-->[:capacitor-haptics] /home/kali/Repos/SumoApp/app/node_modules/@capacitor/haptics/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:7:22-63
+35
+36    <uses-feature
+36-->[:capacitor-community-bluetooth-le] /home/kali/Repos/SumoApp/app/node_modules/@capacitor-community/bluetooth-le/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:23:5-25:36
+37        android:name="android.hardware.bluetooth_le"
+37-->[:capacitor-community-bluetooth-le] /home/kali/Repos/SumoApp/app/node_modules/@capacitor-community/bluetooth-le/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:24:9-53
+38        android:required="false" />
+38-->[:capacitor-community-bluetooth-le] /home/kali/Repos/SumoApp/app/node_modules/@capacitor-community/bluetooth-le/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:25:9-33
+39
+40    <permission
+40-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:22:5-24:47
+41        android:name="com.booctrl.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+41-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:23:9-81
+42        android:protectionLevel="signature" />
+42-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:24:9-44
+43
+44    <uses-permission android:name="com.booctrl.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+44-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:26:5-97
+44-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:26:22-94
+45
+46    <application
+46-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:22:5-35:19
+47        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+47-->[androidx.core:core:1.10.0] /home/kali/.gradle/caches/8.9/transforms/737e481a74af7706121d2944943e1ad1/transformed/core-1.10.0/AndroidManifest.xml:28:18-86
+48        android:debuggable="true"
+49        android:extractNativeLibs="false"
+50        android:icon="@mipmap/ic_launcher"
+50-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:24:9-43
+51        android:label="@string/app_name"
+51-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:23:9-41
+52        android:roundIcon="@mipmap/ic_launcher"
+52-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:25:9-48
+53        android:theme="@style/Theme.BooCtrl" >
+53-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:26:9-45
+54        <activity
+54-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:27:9-34:20
+55            android:name="com.booctrl.app.MainActivity"
+55-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:28:13-56
+56            android:exported="true" >
+56-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:29:13-36
+57            <intent-filter>
+57-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:30:13-33:29
+58                <action android:name="android.intent.action.MAIN" />
+58-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:31:17-69
+58-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:31:25-66
+59
+60                <category android:name="android.intent.category.LAUNCHER" />
+60-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:32:17-77
+60-->/home/kali/Repos/SumoApp/app/android/app/src/main/AndroidManifest.xml:32:27-74
+61            </intent-filter>
+62        </activity>
+63
+64        <provider
+64-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+65            android:name="androidx.startup.InitializationProvider"
+65-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
+66            android:authorities="com.booctrl.app.androidx-startup"
+66-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
+67            android:exported="false" >
+67-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
+68            <meta-data
+68-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+69                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+69-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
+70                android:value="androidx.startup" />
+70-->[androidx.emoji2:emoji2:1.2.0] /home/kali/.gradle/caches/8.9/transforms/77b1114699b410cce58e5184d7187920/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
+71            <meta-data
+71-->[androidx.lifecycle:lifecycle-process:2.6.1] /home/kali/.gradle/caches/8.9/transforms/371a7fef12a1cc8f893dcbd55aa992fe/transformed/jetified-lifecycle-process-2.6.1/AndroidManifest.xml:29:13-31:52
+72                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+72-->[androidx.lifecycle:lifecycle-process:2.6.1] /home/kali/.gradle/caches/8.9/transforms/371a7fef12a1cc8f893dcbd55aa992fe/transformed/jetified-lifecycle-process-2.6.1/AndroidManifest.xml:30:17-78
+73                android:value="androidx.startup" />
+73-->[androidx.lifecycle:lifecycle-process:2.6.1] /home/kali/.gradle/caches/8.9/transforms/371a7fef12a1cc8f893dcbd55aa992fe/transformed/jetified-lifecycle-process-2.6.1/AndroidManifest.xml:31:17-49
+74            <meta-data
+74-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
+75                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+75-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
+76                android:value="androidx.startup" />
+76-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
+77        </provider>
+78
+79        <receiver
+79-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
+80            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+80-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
+81            android:directBootAware="false"
+81-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
+82            android:enabled="true"
+82-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
+83            android:exported="true"
+83-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
+84            android:permission="android.permission.DUMP" >
+84-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
+85            <intent-filter>
+85-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
+86                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+86-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
+86-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
+87            </intent-filter>
+88            <intent-filter>
+88-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
+89                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
+90            </intent-filter>
+91            <intent-filter>
+91-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
+92                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
+93            </intent-filter>
+94            <intent-filter>
+94-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
+95                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+95-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
+95-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/kali/.gradle/caches/8.9/transforms/0b7cf5e201f11072e87d7e02f8004ffb/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
+96            </intent-filter>
+97        </receiver>
+98    </application>
+99
+100</manifest>

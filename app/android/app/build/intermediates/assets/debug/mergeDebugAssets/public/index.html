@@ -1,0 +1,2337 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#080C14" />
+    <title>MadinBoo · DragonBotz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #080c14;
+        --surface: #0d1220;
+        --card: #111827;
+        --card2: #1a2238;
+        --border: rgba(255, 255, 255, 0.08);
+        --border2: rgba(255, 255, 255, 0.14);
+        --accent: #f5c518;
+        --accent2: #00d4ff;
+        --danger: #ff2d55;
+        --success: #00e87a;
+        --text: #e8ecf4;
+        --muted: #6b7a9e;
+        --dim: #2a3550;
+        --font-display: "Orbitron", monospace;
+        --font-body: "Plus Jakarta Sans", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bot: env(safe-area-inset-bottom, 0px);
+        --radius: 12px;
+        --radius-lg: 18px;
+        --card-shadow:
+          0 2px 12px rgba(0, 0, 0, 0.35), 0 0 1px rgba(255, 255, 255, 0.05);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 16px;
+        overscroll-behavior: none;
+      }
+      button {
+        font-family: inherit;
+        border: none;
+        cursor: pointer;
+        outline: none;
+      }
+      input,
+      select {
+        font-family: inherit;
+        outline: none;
+      }
+
+      /* ─── SCREEN MANAGER ──────────────────────────────────── */
+      #splash,
+      #app {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      #splash {
+        z-index: 100;
+        background: var(--bg);
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        gap: 12px;
+        transition:
+          opacity 0.5s,
+          transform 0.5s;
+      }
+      #splash.hide {
+        opacity: 0;
+        transform: scale(0.96);
+        pointer-events: none;
+      }
+      #app {
+        z-index: 50;
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      #app.show {
+        opacity: 1;
+      }
+
+      /* ─── SPLASH / CONNECT ────────────────────────────────── */
+      .splash-glow {
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(245, 197, 24, 0.10) 0%,
+          transparent 68%
+        );
+        top: 41%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+      .logo-wrap {
+        margin-bottom: 40px;
+        text-align: center;
+      }
+      .logo-wrap img {
+        display: block;
+        max-width: 265px;
+        width: 100%;
+        margin: 0 auto;
+        filter: drop-shadow(0 4px 12px rgba(245, 197, 24, 0.3));
+      }
+      .app-version {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 40px;
+        font-family: var(--font-mono);
+      }
+      .bt-btn {
+        width: 100%;
+        max-width: 320px;
+        padding: 18px 24px;
+        border-radius: var(--radius-lg);
+        background: var(--accent);
+        color: #080c14;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition:
+          transform 0.15s,
+          opacity 0.15s;
+        position: relative;
+        overflow: hidden;
+      }
+      .bt-btn:active {
+        transform: scale(0.97);
+      }
+      .bt-btn.connecting {
+        opacity: 0.7;
+        pointer-events: none;
+      }
+      .bt-btn.connecting .spinner {
+        display: block;
+      }
+      .bt-btn.connected {
+        background: var(--success);
+        color: #000;
+      }
+      .bt-btn .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(0, 0, 0, 0.3);
+        border-top-color: #000;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: none;
+      }
+      .demo-btn {
+        margin-top: 16px;
+        width: 100%;
+        max-width: 320px;
+        padding: 14px;
+        border-radius: var(--radius);
+        background: transparent;
+        border: 1px solid var(--border2);
+        color: var(--muted);
+        font-size: 13px;
+        font-family: var(--font-body);
+        letter-spacing: 0.5px;
+        transition:
+          border-color 0.2s,
+          color 0.2s;
+      }
+      .demo-btn:active {
+        background: var(--dim);
+      }
+      .splash-note {
+        margin-top: 32px;
+        font-size: 11px;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.6;
+        max-width: 280px;
+      }
+      .splash-note span {
+        color: var(--accent2);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ─── TOP BAR ─────────────────────────────────────────── */
+      #topbar {
+        padding: calc(var(--safe-top) + 12px) 18px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .tb-left {
+        display: flex;
+        flex-direction: column;
+      }
+      .tb-brand {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--accent);
+      }
+      .tb-status {
+        font-size: 11px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 2px;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--success);
+        flex-shrink: 0;
+      }
+      .status-dot.demo {
+        background: var(--accent2);
+      }
+      .status-dot.disconnected {
+        background: var(--muted);
+      }
+      .tb-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .battery-wrap {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .battery-val {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .battery-icon {
+        width: 26px;
+        height: 13px;
+        border: 1.5px solid var(--border2);
+        border-radius: 3px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 1.5px;
+      }
+      .battery-icon::after {
+        content: "";
+        position: absolute;
+        right: -5px;
+        width: 3px;
+        height: 6px;
+        background: var(--border2);
+        border-radius: 0 1px 1px 0;
+      }
+      .battery-fill {
+        height: 100%;
+        border-radius: 1.5px;
+        background: var(--success);
+        transition:
+          width 0.5s,
+          background 0.5s;
+      }
+      .battery-fill.low {
+        background: var(--danger);
+      }
+      .battery-fill.mid {
+        background: var(--accent);
+      }
+      .stop-btn {
+        background: var(--danger);
+        border-radius: 8px;
+        padding: 7px 12px;
+        font-family: var(--font-display);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition:
+          transform 0.1s,
+          opacity 0.15s;
+      }
+      .stop-btn:active {
+        transform: scale(0.93);
+      }
+      .stop-icon {
+        width: 8px;
+        height: 8px;
+        background: #fff;
+        border-radius: 1px;
+        flex-shrink: 0;
+      }
+
+      /* ─── TABS ────────────────────────────────────────────── */
+      #tabs-wrap {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+      .tabs-track {
+        display: flex;
+        height: 100%;
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+      }
+      .tabs-track.no-transition {
+        transition: none;
+      }
+      .tab-page {
+        width: 100vw;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex-shrink: 0;
+        padding: 16px 16px calc(80px + var(--safe-bot)) 16px;
+      }
+      .tab-page::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* ─── BOTTOM NAV ──────────────────────────────────────── */
+      #bottomnav {
+        padding: 8px 12px calc(var(--safe-bot) + 8px);
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-around;
+        flex-shrink: 0;
+      }
+      .nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 4px 6px;
+        border-radius: var(--radius);
+        background: none;
+        color: var(--muted);
+        transition:
+          color 0.2s,
+          background 0.2s;
+        position: relative;
+      }
+      .nav-item.active {
+        color: var(--accent);
+      }
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 24px;
+        height: 3px;
+        border-radius: 0 0 3px 3px;
+        background: var(--accent);
+        box-shadow: 0 2px 8px rgba(245, 197, 24, 0.4);
+      }
+      .nav-item svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 1.8;
+        transition: transform 0.2s;
+      }
+      .nav-item.active svg {
+        transform: scale(1.1);
+      }
+      .nav-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+
+      /* ─── CARD ────────────────────────────────────────────── */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 18px;
+        margin-bottom: 14px;
+        box-shadow: var(--card-shadow);
+      }
+      .card-head {
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 14px;
+      }
+      .card-head span {
+        color: var(--accent);
+      }
+
+      /* ─── STRATEGY SELECT ─────────────────────────────────── */
+      .strategy-card {
+        padding-bottom: 14px;
+      }
+      .strategy-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .strategy-status {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .strategy-count {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--accent);
+      }
+      .strategy-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .strategy-item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: var(--radius);
+        background: var(--card2);
+        border: 1px solid var(--border);
+        text-align: left;
+        color: var(--text);
+        transition:
+          border-color 0.25s,
+          background 0.25s,
+          transform 0.1s,
+          box-shadow 0.25s;
+      }
+      .strategy-item:active {
+        transform: scale(0.98);
+      }
+      .strategy-item.active {
+        border-color: var(--accent);
+        background: rgba(245, 197, 24, 0.07);
+        box-shadow:
+          0 0 16px rgba(245, 197, 24, 0.08),
+          inset 0 0 0 1px rgba(245, 197, 24, 0.1);
+      }
+      .strategy-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        flex: 1;
+      }
+      .strategy-index {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+      .strategy-name {
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .strategy-item.active .strategy-index {
+        background: rgba(245, 197, 24, 0.15);
+        border-color: rgba(245, 197, 24, 0.35);
+      }
+      .strategy-item.active .strategy-name {
+        color: var(--accent);
+      }
+      .strategy-empty {
+        padding: 18px 14px;
+        border-radius: var(--radius);
+        border: 1px dashed var(--border2);
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      /* ─── SLIDERS ─────────────────────────────────────────── */
+      .slider-wrap {
+        margin-bottom: 14px;
+      }
+      .slider-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .slider-label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .slider-val {
+        font-family: var(--font-mono);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .speed-inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .speed-input {
+        width: 76px;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        text-align: right;
+      }
+      .speed-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(245, 197, 24, 0.08);
+      }
+      .speed-input::-webkit-outer-spin-button,
+      .speed-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .speed-input {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--dim);
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 3px solid var(--bg);
+        box-shadow: 0 0 0 2px var(--accent);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 3px solid var(--bg);
+      }
+      .slider-sub {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* ─── TOGGLE ──────────────────────────────────────────── */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .toggle-row:last-child {
+        border-bottom: none;
+      }
+      .toggle-info .tname {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .toggle-info .tdesc {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .toggle {
+        position: relative;
+        width: 48px;
+        height: 28px;
+        flex-shrink: 0;
+      }
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .toggle-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 14px;
+        background: var(--dim);
+        cursor: pointer;
+        transition:
+          background 0.25s,
+          box-shadow 0.25s;
+      }
+      .toggle input:checked + .toggle-track {
+        background: var(--accent);
+        box-shadow: 0 0 12px rgba(245, 197, 24, 0.35);
+      }
+      .toggle-thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.25s;
+        pointer-events: none;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+      .toggle input:checked ~ .toggle-thumb {
+        transform: translateX(20px);
+      }
+
+      /* ─── SENSOR PANEL ────────────────────────────────────── */
+      .sensor-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .sensor-chip {
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: var(--card-shadow);
+        transition: border-color 0.2s;
+      }
+      .sensor-name {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .sensor-led {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--dim);
+        transition:
+          background 0.2s,
+          box-shadow 0.2s;
+        flex-shrink: 0;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .sensor-led.on {
+        background: var(--success);
+        box-shadow:
+          0 0 10px rgba(0, 232, 122, 0.5),
+          0 0 24px rgba(0, 232, 122, 0.15);
+        border-color: transparent;
+      }
+      .sensor-led.warn {
+        background: var(--danger);
+        box-shadow:
+          0 0 10px rgba(255, 45, 85, 0.5),
+          0 0 24px rgba(255, 45, 85, 0.15);
+        border-color: transparent;
+      }
+
+      /* ─── ROBOT SVG DIAGRAM ───────────────────────────────── */
+      .robot-wrap {
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: var(--card-shadow);
+      }
+      .robot-wrap svg {
+        display: block;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+      }
+
+      /* ─── ANALOG SENSORS ──────────────────────────────────── */
+      .analog-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .analog-item {
+        flex: 1;
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        box-shadow: var(--card-shadow);
+      }
+      .analog-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      .analog-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--dim);
+        overflow: hidden;
+      }
+      .analog-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, var(--accent2), #00aaff);
+        transition: width 0.3s;
+      }
+      .analog-val {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text);
+        margin-top: 5px;
+      }
+
+      /* ─── DEBUG DATA ──────────────────────────────────────── */
+      .debug-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.9;
+        white-space: pre-wrap;
+        word-break: break-all;
+        min-height: 60px;
+        box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.2);
+      }
+      .debug-box .hl {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      /* ─── TOAST ───────────────────────────────────────────── */
+      #toast {
+        position: fixed;
+        bottom: calc(80px + var(--safe-bot) + 12px);
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--card);
+        border: 1px solid var(--border2);
+        color: var(--text);
+        font-size: 13px;
+        padding: 10px 18px;
+        border-radius: 50px;
+        opacity: 0;
+        transition:
+          opacity 0.3s,
+          transform 0.3s;
+        z-index: 999;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* ─── SECTION TITLE ───────────────────────────────────── */
+      .sec-title {
+        font-family: var(--font-display);
+        font-size: 12px;
+        letter-spacing: 2.5px;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin: 20px 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+      }
+      .sec-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--border2), transparent);
+      }
+
+      /* ─── INPUT FIELD ─────────────────────────────────────── */
+      .field-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .field-label {
+        font-size: 13px;
+        color: var(--muted);
+        flex: 1;
+      }
+      .field-input {
+        width: 90px;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        text-align: right;
+      }
+      .field-input:focus {
+        border-color: var(--accent);
+      }
+      .field-send {
+        background: var(--accent);
+        color: #080c14;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        font-family: var(--font-display);
+        transition: transform 0.1s;
+      }
+      .field-send:active {
+        transform: scale(0.95);
+      }
+
+      /* ─── MISC ────────────────────────────────────────────── */
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(245, 197, 24, 0.12);
+        border: 1px solid rgba(245, 197, 24, 0.25);
+        border-radius: 50px;
+        padding: 4px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .full-btn {
+        width: 100%;
+        padding: 16px;
+        border-radius: var(--radius);
+        background: var(--card2);
+        border: 1px solid var(--border2);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 600;
+        transition:
+          background 0.2s,
+          border-color 0.2s,
+          transform 0.1s;
+        box-shadow: var(--card-shadow);
+      }
+      .full-btn:active {
+        background: var(--dim);
+        transform: scale(0.98);
+      }
+      .full-btn.danger {
+        border-color: rgba(255, 45, 85, 0.25);
+        color: var(--danger);
+        background: rgba(255, 45, 85, 0.06);
+      }
+      .spacer {
+        height: 8px;
+      }
+
+      /* ─── SWIPE RIPPLE OVERLAY ────────────────────────────── */
+      .ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(245, 197, 24, 0.2);
+        transform: scale(0);
+        animation: ripple-anim 0.5s linear;
+        pointer-events: none;
+      }
+      @keyframes ripple-anim {
+        to {
+          transform: scale(4);
+          opacity: 0;
+        }
+      }
+
+      /* ─── PULSE ANIMATION ─────────────────────────────────── */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .pulse {
+        animation: pulse 2s ease infinite;
+      }
+
+      /* ─── SCROLLBAR ───────────────────────────────────────── */
+      .tab-page::-webkit-scrollbar {
+        width: 3px;
+      }
+      .tab-page::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .tab-page::-webkit-scrollbar-thumb {
+        background: var(--dim);
+        border-radius: 3px;
+      }
+
+      /* ─── SUBTLE GLOW ON ACTIVE STRATEGY ──────────────────── */
+      @keyframes gentle-glow {
+        0%,
+        100% {
+          box-shadow: 0 0 12px rgba(245, 197, 24, 0.06);
+        }
+        50% {
+          box-shadow: 0 0 18px rgba(245, 197, 24, 0.12);
+        }
+      }
+      .strategy-item.active {
+        animation: gentle-glow 3s ease-in-out infinite;
+      }
+      /* ─── LOG CONSOLE ─────────────────────────────────────── */
+      #log-console {
+        position: fixed;
+        bottom: calc(var(--safe-bot) + 75px);
+        left: 12px;
+        right: 12px;
+        height: 180px;
+        background: rgba(8, 12, 20, 0.95);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      }
+      #log-console.show {
+        display: flex;
+      }
+      .log-header {
+        padding: 8px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: var(--font-display);
+        font-size: 10px;
+        color: var(--accent);
+        letter-spacing: 1px;
+      }
+      .log-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: #fff;
+        line-height: 1.4;
+      }
+      .log-entry {
+        margin-bottom: 4px;
+        border-left: 2px solid var(--dim);
+        padding-left: 8px;
+      }
+      .log-time { color: var(--muted); margin-right: 6px; }
+      .log-error { border-left-color: var(--danger); color: #ff80ab; }
+      .log-warn { border-left-color: var(--accent); color: #ffe57f; }
+      .log-info { border-left-color: var(--accent2); color: #80d8ff; }
+
+    </style>
+    <script type="module" crossorigin src="/assets/index-Dzhi-VWx.js"></script>
+  </head>
+  <body>
+    <!-- LOG CONSOLE -->
+    <div id="log-console">
+      <div class="log-header">
+        <span>SISTEMA > LOG_OUTPUT</span>
+        <button onclick="toggleLogs()" style="background:none; color:var(--muted); font-size:16px;">&times;</button>
+      </div>
+      <div id="log-content" class="log-content"></div>
+    </div>
+    <!-- ═══════════════════ SPLASH SCREEN ═══════════════════ -->
+    <div id="splash">
+      <div class="splash-glow"></div>
+      <div class="logo-wrap">
+        <img
+          src="robo.png"
+          alt="Robo Sumo"
+          style="
+            max-width: 180px;
+            width: auto;
+            filter: none;
+            margin-bottom: 15px;
+          "
+        />
+        <!-- Updated src below. Ensure your transparent file has this name in the same folder -->
+        <img src="logo.png" alt="DragonBotz Logo" />
+      </div>
+      <div class="app-version">MadinBoo APP · v2.0</div>
+      <button id="connect-btn" class="bt-btn" onclick="window.bluetoothAdapter?.handleBluetoothButtonClick()">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <path d="M6.5 6.5l11 11M17.5 6.5L12 12l5.5 5.5M6.5 12H12" />
+        </svg>
+        <span id="connectLabel">Conectar Bluetooth</span>
+        <div class="spinner"></div>
+      </button>
+      <button class="demo-btn" onclick="startDemo()">
+        Entrar em modo demonstração
+      </button>
+      <div id="ble-info-box" style="background: var(--card2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 16px; margin-top: 32px; margin-bottom: 16px; text-align: center;">
+        <p style="color: var(--accent2); font-weight: 600; margin-bottom: 8px;">🔌 Bluetooth Clássico (SPP)</p>
+        <p style="color: var(--muted); font-size: 14px;">Conecte-se ao robô Madinboo através do Bluetooth nativo do Android.<br />A busca automática conectará o dispositivo rapidamente.</p>
+      </div>
+      <div id="status-message" class="status-default" style="padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center; background: var(--card); color: var(--text); font-size: 14px; transition: all 0.3s; min-height: 20px;">Pronto para conectar</div>
+      <style>.status-default { background: var(--card); color: var(--text); } .status-success { background: rgba(0, 232, 122, 0.1); color: var(--success); } .status-error { background: rgba(255, 45, 85, 0.1); color: var(--danger); } .status-scanning { background: rgba(0, 212, 255, 0.1); color: var(--accent2); }</style>
+    </div>
+
+    <!-- ═══════════════════ MAIN APP ═══════════════════════ -->
+    <div id="app">
+      <!-- TOP BAR -->
+      <div id="topbar">
+        <div class="tb-left">
+          <div class="tb-brand">MADINBOO</div>
+          <div class="tb-status">
+            <div class="status-dot disconnected" id="statusDot"></div>
+            <span id="statusText">Desconectado</span>
+          </div>
+        </div>
+        <div class="tb-right">
+          <div class="battery-wrap">
+            <div class="battery-icon">
+              <div class="battery-fill" id="batFill" style="width: 80%"></div>
+            </div>
+            <span class="battery-val" id="batVal">–</span>
+          </div>
+          <button class="stop-btn" onclick="emergencyStop()">
+            <div class="stop-icon"></div>
+            STOP
+          </button>
+        </div>
+      </div>
+
+      <!-- TABS WRAPPER -->
+      <div id="tabs-wrap">
+        <div class="tabs-track" id="track">
+          <!-- ══════ TAB 0: ESTRATÉGIAS ══════ -->
+          <div class="tab-page" id="tabEstrategias">
+            <div class="sec-title">Seleção de Estratégia</div>
+
+            <div class="card strategy-card">
+              <div class="card-head">Lista vinda do <span>firmware</span></div>
+              <div class="strategy-meta">
+                <span class="strategy-status" id="stratStatus"
+                  >Aguardando LISTA do firmware</span
+                >
+                <span class="strategy-count" id="stratCount">0 itens</span>
+              </div>
+              <div class="strategy-list" id="stratGrid"></div>
+            </div>
+
+            <button
+              class="full-btn highlight"
+              onclick="iniciarRobo()"
+              style="
+                margin-bottom: 24px;
+                margin-top: 12px;
+                background: var(--accent);
+                color: var(--bg);
+                font-weight: 700;
+                height: 50px;
+                font-size: 16px;
+                border-radius: 8px;
+              "
+            >
+              ▶ INICIAR ROBÔ
+            </button>
+
+            <div class="sec-title">Velocidades</div>
+            <div class="card">
+              <div class="card-head">Ajuste · <span>Reta & Giro</span></div>
+              <div class="slider-wrap">
+                <div class="slider-head">
+                  <span class="slider-label">Velocidade Reta</span>
+                  <div class="speed-inline">
+                    <span class="slider-val" id="vrVal">200</span>
+                    <input
+                      class="speed-input"
+                      id="vrInput"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1"
+                      inputmode="numeric"
+                      value="200"
+                      oninput="handleSpeedInput('vr', this.value)"
+                    />
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  id="vrSlider"
+                  min="0"
+                  max="255"
+                  value="200"
+                  oninput="handleSpeedInput('vr', this.value)"
+                />
+                <div class="slider-sub"><span>0</span><span>255</span></div>
+              </div>
+              <div class="slider-wrap" style="margin-bottom: 0">
+                <div class="slider-head">
+                  <span class="slider-label">Velocidade Giro</span>
+                  <div class="speed-inline">
+                    <span class="slider-val" id="vgVal">180</span>
+                    <input
+                      class="speed-input"
+                      id="vgInput"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1"
+                      inputmode="numeric"
+                      value="180"
+                      oninput="handleSpeedInput('vg', this.value)"
+                    />
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  id="vgSlider"
+                  min="0"
+                  max="255"
+                  value="180"
+                  oninput="handleSpeedInput('vg', this.value)"
+                />
+                <div class="slider-sub"><span>0</span><span>255</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ TAB 1: SENSORES ══════ -->
+          <div class="tab-page" id="tabSensores">
+            <div class="sec-title">Diagrama do Robô</div>
+            <div class="robot-wrap">
+              <svg
+                viewBox="0 0 240 200"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <!-- chassis -->
+                <rect
+                  x="38"
+                  y="34"
+                  width="164"
+                  height="132"
+                  rx="8"
+                  fill="#192035"
+                  stroke="#2A3550"
+                  stroke-width="1.5"
+                />
+                <!-- wheels -->
+                <rect
+                  x="18"
+                  y="108"
+                  width="18"
+                  height="42"
+                  rx="4"
+                  fill="#0D1220"
+                  stroke="#2A3550"
+                  stroke-width="1.5"
+                />
+                <rect
+                  x="204"
+                  y="108"
+                  width="18"
+                  height="42"
+                  rx="4"
+                  fill="#0D1220"
+                  stroke="#2A3550"
+                  stroke-width="1.5"
+                />
+                <!-- blade -->
+                <rect
+                  x="38"
+                  y="28"
+                  width="164"
+                  height="10"
+                  rx="3"
+                  fill="#131928"
+                  stroke="#2A3550"
+                  stroke-width="1"
+                />
+                <!-- front direction marker -->
+                <path
+                  d="M108 34 L120 22 L132 34"
+                  stroke="#F5C518"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linejoin="round"
+                />
+                <!-- line sensors at the front -->
+                <rect
+                  id="svg_sle"
+                  x="52"
+                  y="40"
+                  width="18"
+                  height="10"
+                  rx="3"
+                  fill="#2A3550"
+                />
+                <text
+                  x="61"
+                  y="57"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  LE
+                </text>
+                <rect
+                  id="svg_sld"
+                  x="170"
+                  y="40"
+                  width="18"
+                  height="10"
+                  rx="3"
+                  fill="#2A3550"
+                />
+                <text
+                  x="179"
+                  y="57"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  LD
+                </text>
+                <!-- SENSOR LABELS & DOTS -->
+                <!-- sen_esq (left) -->
+                <circle id="svg_se" cx="50" cy="75" r="8" fill="#2A3550" />
+                <text
+                  x="50"
+                  y="91"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  SE
+                </text>
+                <!-- sen_centro_esq -->
+                <circle id="svg_sce" cx="90" cy="65" r="8" fill="#2A3550" />
+                <text
+                  x="90"
+                  y="81"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  SCE
+                </text>
+                <!-- sen_centro_dir -->
+                <circle id="svg_scd" cx="150" cy="65" r="8" fill="#2A3550" />
+                <text
+                  x="150"
+                  y="81"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  SCD
+                </text>
+                <!-- sen_dir (right) -->
+                <circle id="svg_sd" cx="190" cy="75" r="8" fill="#2A3550" />
+                <text
+                  x="190"
+                  y="91"
+                  font-family="JetBrains Mono,monospace"
+                  font-size="7"
+                  fill="#5A6585"
+                  text-anchor="middle"
+                >
+                  SD
+                </text>
+                <!-- center area -->
+                <rect
+                  x="96"
+                  y="98"
+                  width="48"
+                  height="30"
+                  rx="4"
+                  fill="#0D1220"
+                  stroke="#2A3550"
+                  stroke-width="1"
+                />
+                <!-- LED indicators -->
+                <circle id="svg_led1" cx="110" cy="113" r="4" fill="#2A3550" />
+                <circle id="svg_led2" cx="130" cy="113" r="4" fill="#2A3550" />
+              </svg>
+            </div>
+
+            <div class="sec-title">Sensores IR</div>
+            <div class="sensor-grid">
+              <div class="sensor-chip">
+                <div>
+                  <div class="sensor-name">Esquerda</div>
+                  <div style="font-size: 10px; color: var(--muted)">pin 33</div>
+                </div>
+                <div class="sensor-led" id="led_se"></div>
+              </div>
+              <div class="sensor-chip">
+                <div>
+                  <div class="sensor-name">Centro-Esq</div>
+                  <div style="font-size: 10px; color: var(--muted)">pin 25</div>
+                </div>
+                <div class="sensor-led" id="led_sce"></div>
+              </div>
+              <div class="sensor-chip">
+                <div>
+                  <div class="sensor-name">Centro-Dir</div>
+                  <div style="font-size: 10px; color: var(--muted)">pin 26</div>
+                </div>
+                <div class="sensor-led" id="led_scd"></div>
+              </div>
+              <div class="sensor-chip">
+                <div>
+                  <div class="sensor-name">Direita</div>
+                  <div style="font-size: 10px; color: var(--muted)">pin 27</div>
+                </div>
+                <div class="sensor-led" id="led_sd"></div>
+              </div>
+            </div>
+
+            <div class="sec-title">Sensores de Linha</div>
+            <div class="analog-row">
+              <div class="analog-item">
+                <div class="analog-label">Linha Direita (pin 35)</div>
+                <div class="analog-bar">
+                  <div class="analog-fill" id="barLD" style="width: 0%"></div>
+                </div>
+                <div class="analog-val" id="valLD">0</div>
+              </div>
+              <div class="analog-item">
+                <div class="analog-label">Linha Esquerda (pin 39)</div>
+                <div class="analog-bar">
+                  <div class="analog-fill" id="barLE" style="width: 0%"></div>
+                </div>
+                <div class="analog-val" id="valLE">0</div>
+              </div>
+            </div>
+
+            <div class="sec-title">Telemetria</div>
+            <div class="debug-box" id="debugBox">
+              — aguardando dados ao vivo —
+            </div>
+          </div>
+
+          <!-- ══════ TAB 2: CONFIG ══════ -->
+          <div class="tab-page" id="tabConfig">
+            <div class="sec-title">Evasão Inteligente</div>
+            <div class="card">
+              <div class="card-head">Detecção · <span>IMU & MPU6050</span></div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="tname">Habilitar Evasão</div>
+                  <div class="tdesc">Detecta colisão via acelerômetro</div>
+                </div>
+                <label class="toggle">
+                  <input
+                    type="checkbox"
+                    id="hbeToggle"
+                    onchange="cacheStartConfigFromUi()"
+                  />
+                  <div class="toggle-track"></div>
+                  <div class="toggle-thumb"></div>
+                </label>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">Limiares · <span>Aceleração</span></div>
+              <div class="field-row">
+                <div class="field-label">Limiar Parado (m/s²)</div>
+                <input
+                  class="field-input"
+                  id="lipInput"
+                  type="number"
+                  step="0.01"
+                  value="0.10"
+                  placeholder="0.10"
+                />
+                <button
+                  class="field-send"
+                  onclick="cacheStartConfigFromUi()"
+                >
+                  OK
+                </button>
+              </div>
+              <div class="field-row" style="margin-bottom: 0">
+                <div class="field-label">Limiar Empurrado (m/s²)</div>
+                <input
+                  class="field-input"
+                  id="lieInput"
+                  type="number"
+                  step="0.01"
+                  value="-0.25"
+                  placeholder="-0.25"
+                />
+                <button
+                  class="field-send"
+                  onclick="cacheStartConfigFromUi()"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+
+            <div class="sec-title">Dispositivo</div>
+            <div class="card">
+              <div class="card-head">Info · <span>Conexão</span></div>
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 13px;
+                  "
+                >
+                  <span style="color: var(--muted)">Nome do dispositivo</span>
+                  <span style="font-family: var(--font-mono)" id="devName"
+                    >Madinboo_BT</span
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 13px;
+                  "
+                >
+                  <span style="color: var(--muted)">Modo</span>
+                  <span class="pill" id="modePill">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="sec-title">Ações</div>
+            <button
+              class="full-btn danger"
+              onclick="disconnect()"
+              style="margin-bottom: 8px"
+            >
+              Desconectar
+            </button>
+          </div>
+        </div>
+        <!-- /track -->
+      </div>
+      <!-- /tabs-wrap -->
+
+      <!-- BOTTOM NAV -->
+      <div id="bottomnav">
+        <button class="nav-item active" onclick="goTab(0)" id="nav0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+            />
+          </svg>
+          <span class="nav-label">Estratégias</span>
+        </button>
+        <button class="nav-item" onclick="goTab(1)" id="nav1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"
+            />
+            <circle cx="12" cy="12" r="7" stroke-dasharray="2 2" />
+          </svg>
+          <span class="nav-label">Sensores</span>
+        </button>
+        <button class="nav-item" onclick="goTab(2)" id="nav2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2M2 12h2M20 12h2"
+            />
+          </svg>
+          <span class="nav-label">Config</span>
+        </button>
+      </div>
+    </div>
+    <!-- /app -->
+
+    <div id="modeOverlay" class="hide">
+      <div class="mode-card">
+        <div class="mode-title">Conectado com Sucesso!</div>
+        <div class="mode-subtitle">
+          Selecione o modo de operação para o aplicativo:
+        </div>
+        <button
+          class="full-btn"
+          onclick="selectAppMode('comp')"
+          style="
+            margin-bottom: 12px;
+            background: var(--accent);
+            color: var(--bg);
+          "
+        >
+          ⚔️ Competição (Oculta Sensores)
+        </button>
+        <button class="full-btn highlight" onclick="selectAppMode('debug')">
+          🐛 Debug (Sem Restrições)
+        </button>
+      </div>
+    </div>
+
+    <style>
+      #modeOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(8, 12, 24, 0.9);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 1;
+        transition: opacity 0.3s;
+      }
+      #modeOverlay.hide {
+        pointer-events: none;
+        opacity: 0;
+      }
+      .mode-card {
+        background: var(--surface);
+        padding: 24px;
+        border-radius: 12px;
+        width: 85%;
+        max-width: 320px;
+        border: 1px solid var(--border);
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+      .mode-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+      .mode-subtitle {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 24px;
+        line-height: 1.4;
+      }
+    </style>
+
+    <div id="toast"></div>
+
+    <script>
+      // ═══════════════════════════════════════════════════════
+      // ESTADO GLOBAL
+      // ═══════════════════════════════════════════════════════
+      const state = {
+        connected: false,
+        demoMode: false,
+        selectedStrat: 1,
+        strategyLoaded: false,
+        currentTab: 0,
+        debugActive: false,
+        startConfig: {
+          vr: 200,
+          vg: 180,
+          hbe: 0,
+          lip: 10,
+          lie: -25,
+        },
+        device: null,
+        rxChar: null,
+        txChar: null,
+        buffer: "",
+        demoInterval: null,
+        bat: 0,
+        sensors: { se: 0, sce: 0, scd: 0, sd: 0, ld: 0, le: 0 },
+      };
+
+      let strategies = [
+        { id: 1, name: "Radar" },
+        { id: 2, name: "Cacador" },
+        { id: 3, name: "Firula" },
+        { id: 4, name: "Suicida" },
+        { id: 5, name: "So Vai" },
+        { id: 6, name: "Contorno" },
+        { id: 7, name: "Seg. Linha" },
+      ];
+
+      // Note: BLE UART UUIDs are no longer used with native Capacitor Bluetooth
+      // The native bridge handles serial communication over Bluetooth Classic (SPP)
+
+      // Utilitário de Debounce para não floodar o ESP32 ao arrastar os sliders
+      function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      }
+      const sendDebouncedVR = debounce(
+        (val) => sendCmd("VR", val, { silent: true }),
+        100,
+      );
+      const sendDebouncedVG = debounce(
+        (val) => sendCmd("VG", val, { silent: true }),
+        100,
+      );
+
+      // ═══════════════════════════════════════════════════════
+      // INIT
+      // ═══════════════════════════════════════════════════════
+      window.addEventListener("DOMContentLoaded", () => {
+        renderStrategyList();
+        updateActiveStrat();
+        updateConnectionUI(false);
+        cacheStartConfigFromUi();
+        // Activation UI removed; no-op
+      });
+
+      function normalizeSpeedValue(rawValue) {
+        const parsedValue = Number.parseInt(rawValue, 10);
+        if (!Number.isFinite(parsedValue)) return null;
+        return Math.max(0, Math.min(255, parsedValue));
+      }
+
+      function syncSpeedControl(prefix, rawValue) {
+        const value = normalizeSpeedValue(rawValue);
+        if (value === null) return null;
+        const slider = document.getElementById(`${prefix}Slider`);
+        const valueLabel = document.getElementById(`${prefix}Val`);
+        const input = document.getElementById(`${prefix}Input`);
+        if (slider && slider.value !== String(value)) slider.value = value;
+        if (valueLabel) valueLabel.textContent = value;
+        if (input && input.value !== String(value)) input.value = value;
+        return value;
+      }
+
+      function handleSpeedInput(prefix, rawValue) {
+        const value = syncSpeedControl(prefix, rawValue);
+        if (value === null) return;
+        cacheStartConfigFromUi();
+      }
+
+      function readLimiterValue(id, fallback) {
+        const field = document.getElementById(id);
+        const parsed = field ? Number.parseFloat(field.value) : NaN;
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : fallback;
+      }
+
+      function readRobotStartConfig() {
+        return {
+          vr:
+            syncSpeedControl(
+              "vr",
+              document.getElementById("vrSlider")?.value ?? state.startConfig.vr,
+            ) ?? state.startConfig.vr,
+          vg:
+            syncSpeedControl(
+              "vg",
+              document.getElementById("vgSlider")?.value ?? state.startConfig.vg,
+            ) ?? state.startConfig.vg,
+          hbe: document.getElementById("hbeToggle")?.checked ? 1 : 0,
+          lip: readLimiterValue("lipInput", state.startConfig.lip),
+          lie: readLimiterValue("lieInput", state.startConfig.lie),
+        };
+      }
+
+      function cacheStartConfigFromUi() {
+        state.startConfig = readRobotStartConfig();
+        return state.startConfig;
+      }
+
+      // Activation UI removed: these are safe no-ops
+      function setActivationState() {}
+      function updateActivationSummary() {}
+
+      function renderStrategyList() {
+        const grid = document.getElementById("stratGrid");
+        const status = document.getElementById("stratStatus");
+        const count = document.getElementById("stratCount");
+        grid.innerHTML = "";
+        if (!strategies.length) {
+          const empty = document.createElement("div");
+          empty.className = "strategy-empty";
+          empty.textContent = "Aguardando LISTA do firmware";
+          grid.appendChild(empty);
+          if (status) status.textContent = "Aguardando LISTA do firmware";
+          if (count) count.textContent = "0 itens";
+          return;
+        }
+        strategies.forEach((s) => {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className =
+            "strategy-item" + (s.id === state.selectedStrat ? " active" : "");
+          el.dataset.id = s.id;
+          el.setAttribute(
+            "aria-pressed",
+            s.id === state.selectedStrat ? "true" : "false",
+          );
+          const main = document.createElement("span");
+          main.className = "strategy-main";
+          const index = document.createElement("span");
+          index.className = "strategy-index";
+          index.textContent = s.id;
+          const name = document.createElement("span");
+          name.className = "strategy-name";
+          name.textContent = s.name;
+          main.appendChild(index);
+          main.appendChild(name);
+          el.appendChild(main);
+          el.addEventListener("click", () => selectStrat(s.id));
+          grid.appendChild(el);
+        });
+        if (status) {
+          status.textContent = state.strategyLoaded
+            ? "Lista sincronizada com o firmware"
+            : "Lista padrão carregada";
+        }
+        if (count) count.textContent = `${strategies.length} itens`;
+        // activation summary removed
+      }
+
+      function selectStrat(id) {
+        const nextId = Number.parseInt(id, 10);
+        if (!Number.isFinite(nextId)) return;
+        state.selectedStrat = nextId;
+        updateStrategySelection();
+        updateActiveStrat();
+      }
+
+      function updateStrategySelection() {
+        document.querySelectorAll(".strategy-item").forEach((el) => {
+          const isActive =
+            Number.parseInt(el.dataset.id, 10) === state.selectedStrat;
+          el.classList.toggle("active", isActive);
+          el.setAttribute("aria-pressed", isActive ? "true" : "false");
+        });
+      }
+
+      function syncStrategyListFromFirmware(packet) {
+        const payload = packet.replace(/^STR:/, "").replace(/\*+$/, "");
+        const nextStrategies = payload
+          .split(",")
+          .map((entry) => {
+            const [idPart, namePart] = entry.split("=");
+            const nextId = Number.parseInt(idPart, 10);
+            const nextName = (namePart || "").trim();
+            if (!Number.isFinite(nextId) || !nextName) return null;
+            return { id: nextId, name: nextName };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.id - b.id);
+
+        if (!nextStrategies.length) return;
+
+        strategies = nextStrategies;
+        state.strategyLoaded = true;
+        if (!strategies.some((item) => item.id === state.selectedStrat)) {
+          state.selectedStrat = strategies[0].id;
+        }
+        renderStrategyList();
+        updateStrategySelection();
+        updateActiveStrat();
+        // activation summary removed
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // BLUETOOTH (Native Capacitor adapter)
+      // ═══════════════════════════════════════════════════════
+      async function startConnect() {
+        const btn = document.getElementById("connectBtn");
+        btn.classList.add("connecting");
+        document.getElementById("connectLabel").textContent = "Procurando…";
+        try {
+          // Use native Bluetooth discovery
+          if (window.nativeStartConnect) {
+            await window.nativeStartConnect();
+          } else {
+            showToast("Bluetooth nativo não disponível");
+          }
+        } catch (e) {
+          btn.classList.remove("connecting");
+          document.getElementById("connectLabel").textContent =
+            "Conectar via Bluetooth";
+          showToast("Erro: " + (e.message || "falha na descoberta"));
+        }
+      }
+      
+      // Callback from native Bluetooth adapter when device is found and connected
+      window.onNativeBluetoothConnected = function(data) {
+        const btn = document.getElementById("connectBtn");
+        btn.classList.remove("connecting");
+        document.getElementById("connectLabel").textContent =
+          "Conectar via Bluetooth";
+        
+        state.connected = true;
+        state.demoMode = false;
+        launchApp("ble");
+        document.getElementById("modeOverlay").classList.remove("hide");
+        
+        // Send initialization commands
+        sendCmd("LISTA", "", { silent: true });
+        sendCmd("DEBUG", 1, { silent: true });
+        state.debugActive = true;
+      };
+      
+      // Callback from native Bluetooth adapter on disconnect
+      window.onNativeBluetoothDisconnected = function() {
+        onDisconnected();
+      };
+      
+      // Callback from native Bluetooth adapter for incoming data
+      window.onNativeBluetoothData = function(line) {
+        parseData(line);
+      };
+      
+      // Callback for Bluetooth errors
+      window.onNativeBluetoothError = function(message) {
+        showToast("Bluetooth: " + message);
+      };
+
+      function onDataReceived(evt) {
+        const decoder = new TextDecoder();
+        state.buffer += decoder.decode(evt.target.value);
+        let newlineIndex = state.buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const line = state.buffer.slice(0, newlineIndex).trim();
+          state.buffer = state.buffer.slice(newlineIndex + 1);
+          if (line) parseData(line);
+          newlineIndex = state.buffer.indexOf("\n");
+        }
+      }
+
+      function onDisconnected() {
+        state.connected = false;
+        state.txChar = null;
+        state.rxChar = null;
+        state.debugActive = false;
+        updateConnectionUI(false);
+        updateActivationSummary();
+        setActivationState("Aguardando conexão BLE");
+        document.getElementById("modeOverlay").classList.add("hide");
+        document.getElementById("nav1").style.display = "flex"; // Reset Sensores tab
+
+        // Aviso visual crítico na interface
+        const debugBox = document.getElementById("debugBox");
+        if (debugBox) {
+          debugBox.innerHTML = `<span style="color:var(--danger)">[ ! ] CONEXÃO PERDIDA</span>`;
+        }
+        showToast("Dispositivo desconectado. Tentando reconectar...");
+
+        // Retorna para a tela de splash após 2 segundos
+        setTimeout(() => {
+          stopDemo();
+        }, 2000);
+      }
+
+      async function sendCmd(cmd, value, options = {}) {
+        const { silent = false, throwOnError = false } = options;
+        const fail = (message) => {
+          if (!silent) showToast(message);
+          if (throwOnError) throw new Error(message);
+          return false;
+        };
+        const msg = `${cmd},${value},*`;
+        if (state.demoMode) {
+          console.log("[DEMO] send:", msg);
+          handleDemoCmd(cmd, value);
+          if (!silent) showToast(`Enviado: ${cmd}=${value}`);
+          return true;
+        }
+        if (!state.connected) {
+          return fail("Não conectado");
+        }
+        try {
+          // Use native Bluetooth to send command
+          if (window.nativeSendCommand) {
+            await window.nativeSendCommand(cmd, value);
+            if (!silent) showToast(`Enviado: ${cmd}=${value}`);
+            return true;
+          } else {
+            return fail("Native Bluetooth não disponível");
+          }
+        } catch (e) {
+          const err = e instanceof Error ? e : new Error(String(e));
+          if (!silent) showToast("Erro ao enviar: " + err.message);
+          if (throwOnError) throw err;
+          return false;
+        }
+      }
+
+      async function disconnect() {
+        if (state.demoMode) {
+          stopDemo();
+          return;
+        }
+        try {
+          await sendCmd("DEBUG", 0, { silent: true });
+          // Close native Bluetooth connection
+          if (window.nativeStopConnect) {
+            await window.nativeStopConnect();
+          }
+        } catch (e) {
+          console.error("Disconnect error:", e);
+        }
+        stopDemo();
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // DEMO MODE
+      // ═══════════════════════════════════════════════════════
+      function startDemo() {
+        state.demoMode = true;
+        state.connected = false;
+        launchApp("demo");
+        document.getElementById("modeOverlay").classList.remove("hide");
+        updateActivationSummary();
+        setActivationState("Modo demo");
+        state.demoInterval = setInterval(generateDemoData, 800);
+      }
+
+      function stopDemo() {
+        clearInterval(state.demoInterval);
+        state.demoMode = false;
+        document.getElementById("splash").classList.remove("hide");
+        document.getElementById("app").classList.remove("show");
+        document.getElementById("modeOverlay").classList.add("hide");
+        document.getElementById("connectBtn").classList.remove("connecting");
+        document.getElementById("connectLabel").textContent =
+          "Conectar via Bluetooth";
+        updateActivationSummary();
+        setActivationState("Aguardando conexão BLE");
+      }
+
+      function generateDemoData() {
+        const vr = document.getElementById("vrSlider").value;
+        const vg = document.getElementById("vgSlider").value;
+        const hbe = document.getElementById("hbeToggle").checked ? 1 : 0;
+        const lip = document.getElementById("lipInput").value;
+        const lie = document.getElementById("lieInput").value;
+        const bat = (7.2 + Math.random() * 0.4).toFixed(2);
+        const sd = Math.random() > 0.6 ? 1 : 0;
+        const scd = Math.random() > 0.7 ? 1 : 0;
+        const sce = Math.random() > 0.7 ? 1 : 0;
+        const se = Math.random() > 0.6 ? 1 : 0;
+        const ld = Math.floor(Math.random() * 4095);
+        const le = Math.floor(Math.random() * 4095);
+        const line = `${vr}|${vg}|${hbe}|${Math.round(parseFloat(lip) * 100)}|${Math.round(parseFloat(lie) * 100)}|${bat}|${sd}|${scd}|${sce}|${se}|${ld}|${le}`;
+        parseData(line);
+      }
+
+      function handleDemoCmd(cmd, value) {
+        if (cmd === "VR") {
+          document.getElementById("vrVal").textContent = value;
+          document.getElementById("vrSlider").value = value;
+        }
+        if (cmd === "VG") {
+          document.getElementById("vgVal").textContent = value;
+          document.getElementById("vgSlider").value = value;
+        }
+        if (cmd === "HBE") {
+          document.getElementById("hbeToggle").checked = Number.parseInt(value, 10) === 1;
+        }
+        if (cmd === "LIP") {
+          document.getElementById("lipInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
+        }
+        if (cmd === "LIE") {
+          document.getElementById("lieInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
+        }
+        if (cmd === "EST") {
+          state.selectedStrat = Number.parseInt(value, 10);
+          updateStrategySelection();
+          updateActiveStrat();
+          updateActivationSummary();
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // DATA PARSING
+      // ═══════════════════════════════════════════════════════
+      // Format: velocreta|velocgiro|HBEvasao|limiarParado|limiarEmpurrado|Vbat|sen_dir|sen_centro_dir|sen_centro_esq|sen_esq|sensorLD|sensorLE
+      function parseData(line) {
+        if (!line) return;
+        // Strategy list packet
+        if (line.startsWith("STR:")) {
+          syncStrategyListFromFirmware(line);
+          return;
+        }
+        const parts = line.split("|");
+        if (parts.length < 12) {
+          document.getElementById("debugBox").textContent = line;
+          return;
+        }
+        const [vr, vg, hbe, lip, lie, vbat, sd, scd, sce, se, ld, le] = parts;
+        // Update sliders if different
+        syncSpeedControl("vr", vr);
+        syncSpeedControl("vg", vg);
+        // Update toggle
+        document.getElementById("hbeToggle").checked = parseInt(hbe) === 1;
+        document.getElementById("lipInput").value = (parseFloat(lip) / 100).toFixed(2);
+        document.getElementById("lieInput").value = (parseFloat(lie) / 100).toFixed(2);
+        cacheStartConfigFromUi();
+        // Battery
+        const batV = parseFloat(vbat);
+        updateBattery(batV);
+        // Sensors
+        updateSensor("sd", parseInt(sd));
+        updateSensor("scd", parseInt(scd));
+        updateSensor("sce", parseInt(sce));
+        updateSensor("se", parseInt(se));
+        // Analog
+        const ldV = parseInt(ld),
+          leV = parseInt(le);
+        document.getElementById("barLD").style.width =
+          ((ldV / 4095) * 100).toFixed(1) + "%";
+        document.getElementById("valLD").textContent = ldV;
+        document.getElementById("barLE").style.width =
+          ((leV / 4095) * 100).toFixed(1) + "%";
+        document.getElementById("valLE").textContent = leV;
+        // SVG line sensors color
+        document
+          .getElementById("svg_sld")
+          .setAttribute("fill", ldV < 200 ? "#FF2D55" : "#2A3550");
+        document
+          .getElementById("svg_sle")
+          .setAttribute("fill", leV < 200 ? "#FF2D55" : "#2A3550");
+        // Debug box
+        document.getElementById("debugBox").innerHTML =
+          `<span class="hl">VR</span>=${vr}  <span class="hl">VG</span>=${vg}  <span class="hl">HBE</span>=${hbe}\n` +
+          `<span class="hl">Bat</span>=${parseFloat(vbat).toFixed(2)}V\n` +
+          `<span class="hl">IR</span>  SD=${sd} SCD=${scd} SCE=${sce} SE=${se}\n` +
+          `<span class="hl">LN</span>  LD=${ldV} LE=${leV}`;
+      }
+
+      function updateSensor(name, val) {
+        const led = document.getElementById("led_" + name);
+        const svgEl = document.getElementById("svg_" + name);
+        if (!led) return;
+        if (val === 1) {
+          led.classList.add("on");
+          led.classList.remove("warn");
+          if (svgEl) svgEl.setAttribute("fill", "#00E87A");
+        } else {
+          led.classList.remove("on", "warn");
+          if (svgEl) svgEl.setAttribute("fill", "#2A3550");
+        }
+      }
+
+      function updateBattery(v) {
+        document.getElementById("batVal").textContent = v.toFixed(1) + "V";
+        const pct = Math.max(0, Math.min(100, ((v - 6.0) / (8.4 - 6.0)) * 100));
+        const fill = document.getElementById("batFill");
+        fill.style.width = pct.toFixed(0) + "%";
+        fill.className =
+          "battery-fill" + (pct < 20 ? " low" : pct < 50 ? " mid" : "");
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // APP LAUNCH
+      // ═══════════════════════════════════════════════════════
+      function launchApp(mode) {
+        document.getElementById("splash").classList.add("hide");
+        const app = document.getElementById("app");
+        app.classList.add("show");
+        const dot = document.getElementById("statusDot");
+        const txt = document.getElementById("statusText");
+        const pill = document.getElementById("modePill");
+        if (mode === "demo") {
+          dot.className = "status-dot demo";
+          txt.textContent = "Modo Demo";
+          pill.textContent = "DEMO";
+          pill.style.background = "rgba(0,212,255,.12)";
+          pill.style.borderColor = "rgba(0,212,255,.25)";
+          pill.style.color = "var(--accent2)";
+        } else {
+          dot.className = "status-dot";
+          txt.textContent = "BLE · Madinboo_BT";
+          pill.textContent = "BLE";
+          pill.style.background = "rgba(0,232,122,.12)";
+          pill.style.borderColor = "rgba(0,232,122,.25)";
+          pill.style.color = "var(--success)";
+          txt.textContent = "Conectado · IR pendente";
+        }
+        updateActiveStrat();
+        updateActivationSummary();
+      }
+
+      function updateConnectionUI(connected) {
+        const dot = document.getElementById("statusDot");
+        dot.className = "status-dot" + (connected ? "" : " disconnected");
+        document.getElementById("statusText").textContent = connected
+          ? "Conectado"
+          : "Desconectado";
+        updateActivationSummary();
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // ACTIONS
+      // ═══════════════════════════════════════════════════════
+      function sendStrategy() {
+        return iniciarRobo();
+      }
+
+      async function startRobotSequence() {
+        const config = cacheStartConfigFromUi();
+        await sendCmd("VR", config.vr, { silent: true, throwOnError: true });
+        await sendCmd("VG", config.vg, { silent: true, throwOnError: true });
+        await sendCmd("HBE", config.hbe, { silent: true, throwOnError: true });
+        if (config.hbe === 1) {
+          await sendCmd("LIP", config.lip, { silent: true, throwOnError: true });
+          await sendCmd("LIE", config.lie, { silent: true, throwOnError: true });
+        }
+        await sendCmd("EST", state.selectedStrat, {
+          silent: true,
+          throwOnError: true,
+        });
+        updateActiveStrat();
+      }
+
+      async function iniciarRobo() {
+        if (!state.connected && !state.demoMode) {
+          showToast("Robô não conectado!");
+          return;
+        }
+        try {
+          await startRobotSequence();
+          showToast("Iniciando robô (Estratégia " + state.selectedStrat + ")");
+        } catch (e) {
+          showToast("Erro ao iniciar robô: " + (e.message || "falha no envio"));
+        }
+      }
+
+      function selectAppMode(mode) {
+        document.getElementById("modeOverlay").classList.add("hide");
+        if (mode === "comp") {
+          document.getElementById("nav1").style.display = "none"; // Hide Sensores tab button
+          showToast("Modo Competição ativado");
+        } else {
+          document.getElementById("nav1").style.display = "flex"; // Show Sensores tab button
+          showToast("Modo Debug ativado");
+        }
+        goTab(0); // Start at Estrategias
+      }
+
+      function updateActiveStrat() {
+        const s = strategies.find((x) => x.id === state.selectedStrat);
+        const element = document.getElementById("activeStratName");
+        if (element) element.textContent = s ? s.name : "—";
+        updateActivationSummary();
+      }
+
+      function emergencyStop() {
+        sendCmd("PARADA", "");
+        showToast("⛔ Parada de Emergência!");
+        // Ripple on stop btn
+        const btn = document.querySelector(".stop-btn");
+        btn.style.transform = "scale(0.88)";
+        setTimeout(() => (btn.style.transform = ""), 200);
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // TAB NAVIGATION + SWIPE
+      // ═══════════════════════════════════════════════════════
+      function goTab(idx) {
+        state.currentTab = idx;
+        const track = document.getElementById("track");
+        track.style.transform = `translateX(${-idx * 100}vw)`;
+        document.querySelectorAll(".nav-item").forEach((el, i) => {
+          el.classList.toggle("active", i === idx);
+        });
+      }
+
+      // Touch swipe
+      (function () {
+        let startX,
+          startY,
+          dragging = false,
+          startTab;
+        const wrap = document.getElementById("tabs-wrap");
+        const track = document.getElementById("track");
+        const TABS = 3;
+
+        wrap.addEventListener(
+          "touchstart",
+          (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startTab = state.currentTab;
+            dragging = true;
+            track.classList.add("no-transition");
+          },
+          { passive: true },
+        );
+
+        wrap.addEventListener(
+          "touchmove",
+          (e) => {
+            if (!dragging) return;
+            const dx = e.touches[0].clientX - startX;
+            const dy = e.touches[0].clientY - startY;
+            if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 10) {
+              dragging = false;
+              return;
+            }
+            const base = -startTab * window.innerWidth;
+            const clamped = Math.max(
+              -(TABS - 1) * window.innerWidth,
+              Math.min(0, base + dx),
+            );
+            track.style.transform = `translateX(${clamped}px)`;
+          },
+          { passive: true },
+        );
+
+        wrap.addEventListener(
+          "touchend",
+          (e) => {
+            if (!dragging) return;
+            dragging = false;
+            track.classList.remove("no-transition");
+            const dx = e.changedTouches[0].clientX - startX;
+            const threshold = window.innerWidth * 0.28;
+            let next = startTab;
+            if (dx < -threshold && startTab < TABS - 1) next = startTab + 1;
+            else if (dx > threshold && startTab > 0) next = startTab - 1;
+            goTab(next);
+          },
+          { passive: true },
+        );
+      })();
+
+      // ═══════════════════════════════════════════════════════
+      // TOAST
+      // ═══════════════════════════════════════════════════════
+      let toastTimer;
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+R_DEF: Internal format may change without notice
+local
+drawable dragonbotz_splash_logo
+drawable splash_screen
+mipmap ic_launcher
+string app_name
+style Theme.BooCtrl
+style Theme.BooCtrl.Base
+xml config

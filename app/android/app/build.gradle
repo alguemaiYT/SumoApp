@@ -9,10 +9,10 @@ repositories {
 
 android {
   compileSdk rootProject.ext.compileSdkVersion
-  namespace "com.dragonbotz.sumoapp"
+  namespace "com.booctrl.app"
 
   defaultConfig {
-    applicationId "com.dragonbotz.sumoapp"
+    applicationId "com.booctrl.app"
     minSdk rootProject.ext.minSdkVersion
     targetSdk rootProject.ext.targetSdkVersion
     versionCode 1
@@ -33,8 +33,8 @@ android {
   }
 
   compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_8
-    targetCompatibility JavaVersion.VERSION_1_8
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
   }
 
   buildFeatures {

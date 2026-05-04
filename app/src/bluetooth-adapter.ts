@@ -11,45 +11,51 @@ export class BluetoothAdapter {
   }
 
   private attachListeners() {
-    bleService.on('connected', (device) => {
+    bleService.on('connected', async (device) => {
       console.log('Connected to:', device);
+      await Haptics.vibrate({ duration: 200 });
       this.updateUI();
       this.showStatus(`Conectado: ${device.name}`, 'success');
+      if (typeof (window as any).onNativeBluetoothConnected === 'function') {
+        (window as any).onNativeBluetoothConnected(device);
+      }
     });
 
     bleService.on('disconnected', () => {
       console.log('Disconnected');
       this.updateUI();
       this.showStatus('Desconectado', 'default');
-    });
-
-    bleService.on('dataReceived', (data) => {
-      console.log('Data received:', data);
-      this.handleTelemetry(data.data);
-    });
-
-    bleService.on('error', (err) => {
-      console.error('BLE error:', err);
-      this.showStatus(err.message, 'error');
+      if (typeof (window as any).onNativeBluetoothDisconnected === 'function') {
+        (window as any).onNativeBluetoothDisconnected();
+      }
     });
 
     bleService.on('scanningState', (state) => {
+      this.updateUI();
       if (state.scanning) {
         this.showStatus('Procurando robô...', 'scanning');
       }
     });
 
-    bleService.on('deviceFound', (device) => {
+    bleService.on('deviceFound', async (device) => {
       this.showStatus(`Robô encontrado: ${device.name}`, 'success');
+      await Haptics.vibrate({ duration: 150 });
     });
   }
 
   async handleBluetoothButtonClick() {
+    console.log('Bluetooth button clicked');
+    // Request permissions first
+    await bleService.requestPermissions();
+
     if (bleService.isConnectedToDevice()) {
+      console.log('Disconnecting...');
       await bleService.disconnect();
     } else {
+      console.log('Starting auto-discovery...');
       // Vibrate to indicate search start
       await Haptics.vibrate({ duration: 75 });
+      this.updateUI();
       await bleService.startAutoDiscovery();
     }
     this.updateUI();
@@ -87,10 +93,15 @@ export class BluetoothAdapter {
 
   private updateUI() {
     const connectBtn = document.getElementById('connect-btn');
-    if (connectBtn) {
+    const connectLabel = document.getElementById('connectLabel');
+    
+    if (connectBtn && connectLabel) {
       const isConnected = bleService.isConnectedToDevice();
-      connectBtn.textContent = isConnected ? 'Desconectar' : 'Conectar Bluetooth';
-      connectBtn.className = isConnected ? 'btn-connected' : 'btn-default';
+      connectLabel.textContent = isConnected ? 'Desconectar' : 'Conectar Bluetooth';
+      connectBtn.classList.toggle('connecting', bleService.isScanning());
+      connectBtn.classList.toggle('connected', isConnected);
+    } else {
+      console.warn('UI elements for Bluetooth not found');
     }
   }
 

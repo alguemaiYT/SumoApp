@@ -1,0 +1,18 @@
+{
+	"appId": "com.booctrl.app",
+	"appName": "BooCtrl",
+	"webDir": "www",
+	"plugins": {
+		"BluetoothLe": {
+			"displayStrings": {
+				"scanning": "Procurando robôs...",
+				"cancel": "Cancelar",
+				"availableDevices": "Dispositivos disponíveis",
+				"noDeviceFound": "Nenhum dispositivo encontrado"
+			}
+		},
+		"KeepAwake": {
+			"enable": true
+		}
+	}
+}

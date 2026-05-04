@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     StatusBar.setStyle({ style: 'light' });
 
     // Initialize keep-awake
-    await KeepAwake.enable();
+    await KeepAwake.keepAwake().catch(() => console.warn("KeepAwake not supported"));
 
     // Initialize Bluetooth adapter
     await bluetoothAdapter.init();

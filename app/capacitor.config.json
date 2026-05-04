@@ -1,6 +1,6 @@
 {
-  "appId": "com.dragonbotz.sumoapp",
-  "appName": "SumoApp",
+  "appId": "com.booctrl.app",
+  "appName": "BooCtrl",
   "webDir": "www",
   "plugins": {
     "BluetoothLe": {

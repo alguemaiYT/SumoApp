@@ -1,0 +1,34 @@
+[
+    {
+        "merged": "com.booctrl.app-debug-33:/drawable-nodpi_dragonbotz_splash_logo.png.flat",
+        "source": "com.booctrl.app-main-35:/drawable-nodpi/dragonbotz_splash_logo.png"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/xml_config.xml.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/xml/config.xml"
+    },
+    {
+        "merged": "com.booctrl.app-debug-33:/drawable_splash_screen.xml.flat",
+        "source": "com.booctrl.app-main-35:/drawable/splash_screen.xml"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/mipmap-mdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-debug-33:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "/home/kali/.gradle/daemon/8.9/com.booctrl.app-main-35:/mipmap-xhdpi/ic_launcher.png"
+    }
+]

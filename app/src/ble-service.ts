@@ -1,36 +1,82 @@
-import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
+import { registerPlugin } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { Haptics } from '@capacitor/haptics';
 
 export interface BluetoothDevice {
   name: string;
-  deviceId: string;
+  address: string;
 }
+
+interface BluetoothClassicPlugin {
+  isAvailable(): Promise<{ available: boolean }>;
+  isEnabled(): Promise<{ enabled: boolean }>;
+  isConnected(): Promise<{ connected: boolean }>;
+  requestPermissions(): Promise<void>;
+  startDiscovery(): Promise<void>;
+  stopDiscovery(): Promise<void>;
+  connect(options: { address: string }): Promise<void>;
+  disconnect(): Promise<void>;
+  sendCommand(options: { command: string }): Promise<void>;
+  addListener(eventName: string, listenerFunc: (data: any) => void): Promise<any>;
+  removeAllListeners(): Promise<void>;
+}
+
+const BluetoothClassic = registerPlugin<BluetoothClassicPlugin>('BluetoothClassic');
 
 export class BLEService {
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
   private connectedDevice: BluetoothDevice | null = null;
   private scanInProgress = false;
-  private commandQueue: string[] = [];
   private isConnected = false;
-
-  // UART Service & Characteristics UUIDs
-  private readonly SERVICE_UUID = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E';
-  private readonly TX_CHAR = '6E400002-B5A3-F393-E0A9-E50E24DCCA9E'; // Write to robot
-  private readonly RX_CHAR = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E'; // Read from robot
   private readonly ROBOT_NAME = 'Madinboo';
 
   constructor() {
-    this.initBLE();
+    this.initBluetooth();
   }
 
-  private async initBLE() {
+  private async initBluetooth() {
+    console.log('BLEService: Initializing Bluetooth...');
     try {
-      await BleClient.initialize();
-      console.log('BLE initialized');
+      const { available } = await BluetoothClassic.isAvailable();
+      console.log('BLEService: Bluetooth availability:', available);
+      if (!available) {
+        console.error('BLEService: Bluetooth not available');
+        return;
+      }
+
+      await BluetoothClassic.removeAllListeners();
+
+      await BluetoothClassic.addListener('deviceFound', (device: BluetoothDevice) => {
+        console.log('BLEService: Device found event:', device.name, device.address);
+        if (device.name?.includes(this.ROBOT_NAME)) {
+          console.log('BLEService: Target robot found! Auto-connecting...');
+          this.emit('deviceFound', device);
+          this.connect(device);
+        }
+      });
+
+      await BluetoothClassic.addListener('connected', (device: BluetoothDevice) => {
+        console.log('BLEService: Connected successfully to:', device.name);
+        this.connectedDevice = device;
+        this.isConnected = true;
+        this.emit('connected', device);
+        
+        Preferences.set({
+          key: 'lastDevice',
+          value: JSON.stringify(device),
+        });
+      });
+
+      await BluetoothClassic.addListener('scanningState', (state: { scanning: boolean }) => {
+        console.log('BLEService: Scanning state changed:', state.scanning);
+        this.scanInProgress = state.scanning;
+        this.emit('scanningState', state);
+      });
+
+      console.log('BLEService: Listeners attached and ready');
       this.emit('bleReady', {});
     } catch (err) {
-      console.error('BLE init error:', err);
+      console.error('BLEService: Init error:', err);
       this.emit('error', { message: 'Falha ao inicializar Bluetooth' });
     }
   }
@@ -50,141 +96,91 @@ export class BLEService {
     this.listeners.get(event)?.forEach(cb => cb(data));
   }
 
-  // Auto-discovery: scan for robot, vibrate when found
-  async startAutoDiscovery() {
-    if (this.scanInProgress) return;
-    this.scanInProgress = true;
-    this.emit('scanningState', { scanning: true });
-
+  async requestPermissions(): Promise<boolean> {
+    console.log('BLEService: Checking permissions...');
     try {
-      await BleClient.requestLEScan(
-        { services: [] },
-        async (result) => {
-          if (result.device.name?.includes(this.ROBOT_NAME)) {
-            // Device found!
-            await Haptics.vibrate({ duration: 100 });
-            await Haptics.vibrate({ duration: 100 });
-            this.emit('deviceFound', {
-              name: result.device.name,
-              deviceId: result.device.deviceId,
-            });
-            // Auto-connect
-            await this.connect({
-              name: result.device.name,
-              deviceId: result.device.deviceId,
-            });
-            await this.stopScan();
-          }
-        }
-      );
+      const status = await BluetoothClassic.checkPermissions();
+      console.log('BLEService: Permission status:', status);
+
+      if (status.bluetooth === 'granted' && status.location === 'granted') {
+        return true;
+      }
+
+      console.log('BLEService: Requesting permissions...');
+      const requestResult = await BluetoothClassic.requestPermissions();
+      console.log('BLEService: Request result:', requestResult);
+
+      return requestResult.bluetooth === 'granted' && requestResult.location === 'granted';
+    } catch (err) {
+      console.error('BLEService: Permission logic error:', err);
+      return false;
+    }
+  }
+
+  async startAutoDiscovery() {
+    if (this.scanInProgress) {
+        await this.stopScan();
+    }
+    
+    try {
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        this.emit('error', { message: 'Permissões negadas. O app precisa de Bluetooth e Localização.' });
+        return;
+      }
+
+      await BluetoothClassic.startDiscovery();
     } catch (err) {
       console.error('Scan error:', err);
-      this.emit('error', { message: 'Erro ao procurar dispositivos' });
-      this.scanInProgress = false;
+      this.emit('error', { message: 'Erro ao iniciar busca' });
     }
   }
 
   private async stopScan() {
     try {
-      await BleClient.stopLEScan();
+      await BluetoothClassic.stopDiscovery();
     } catch (err) {
       console.error('Stop scan error:', err);
-    } finally {
-      this.scanInProgress = false;
-      this.emit('scanningState', { scanning: false });
     }
   }
 
   async connect(device: BluetoothDevice) {
     try {
-      await BleClient.connect(device.deviceId);
-      this.connectedDevice = device;
-      this.isConnected = true;
-
-      // Save last device
-      await Preferences.set({
-        key: 'lastDevice',
-        value: JSON.stringify(device),
-      });
-
-      // Vibrate on connect
-      await Haptics.vibrate({ duration: 50 });
-
-      // Start listening for data
-      await this.startNotifications(device.deviceId);
-
-      this.emit('connected', device);
+      this.showConnectingStatus();
+      await BluetoothClassic.connect({ address: device.address });
     } catch (err) {
       console.error('Connect error:', err);
       this.emit('error', { message: 'Falha ao conectar' });
-      this.isConnected = false;
     }
+  }
+
+  private showConnectingStatus() {
+    // This will be handled by UI through events
   }
 
   async disconnect() {
-    if (!this.connectedDevice) return;
-
     try {
-      // Stop notifications before disconnecting
-      await BleClient.stopNotifications(
-        this.connectedDevice.deviceId,
-        this.SERVICE_UUID,
-        this.RX_CHAR
-      );
-      
-      await BleClient.disconnect(this.connectedDevice.deviceId);
+      await BluetoothClassic.disconnect();
     } catch (err) {
       console.error('Disconnect error:', err);
-    } finally {
-      this.isConnected = false;
-      this.connectedDevice = null;
-      this.emit('disconnected', {});
-    }
-  }
-
-  private async startNotifications(deviceId: string) {
-    try {
-      await BleClient.startNotifications(
-        deviceId,
-        this.SERVICE_UUID,
-        this.RX_CHAR,
-        (value) => {
-          const text = new TextDecoder().decode(value);
-          this.emit('dataReceived', { data: text });
-        }
-      );
-    } catch (err) {
-      console.error('Notification error:', err);
     }
   }
 
   async sendCommand(command: string) {
-    if (!this.connectedDevice || !this.isConnected) {
-      console.warn('Not connected');
-      return;
-    }
-
+    if (!this.isConnected) return;
     try {
-      const data = new TextEncoder().encode(command + '\n');
-      await BleClient.write(
-        this.connectedDevice.deviceId,
-        this.SERVICE_UUID,
-        this.TX_CHAR,
-        data
-      );
-      console.log('Command sent:', command);
+      await BluetoothClassic.sendCommand({ command: command + '\n' });
     } catch (err) {
-      console.error('Write error:', err);
-      this.emit('error', { message: 'Erro ao enviar comando' });
+      console.error('Send error:', err);
     }
   }
 
   async tryAutoReconnect() {
     try {
-      const stored = await Preferences.get({ key: 'lastDevice' });
-      if (stored.value) {
-        const device: BluetoothDevice = JSON.parse(stored.value);
-        console.log('Attempting auto-reconnect to:', device.name);
+      const { value } = await Preferences.get({ key: 'lastDevice' });
+      if (value) {
+        const device: BluetoothDevice = JSON.parse(value);
+        console.log('Attempting auto-reconnect to:', device.address);
         await this.connect(device);
       }
     } catch (err) {
@@ -194,6 +190,10 @@ export class BLEService {
 
   isConnectedToDevice(): boolean {
     return this.isConnected;
+  }
+
+  isScanning(): boolean {
+      return this.scanInProgress;
   }
 
   getConnectedDevice(): BluetoothDevice | null {

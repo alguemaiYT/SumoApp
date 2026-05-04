@@ -1370,7 +1370,7 @@
                   <input
                     type="checkbox"
                     id="hbeToggle"
-                    onchange="sendCmd('HBE', this.checked ? 1 : 0)"
+                    onchange="cacheStartConfigFromUi()"
                   />
                   <div class="toggle-track"></div>
                   <div class="toggle-thumb"></div>
@@ -1392,15 +1392,7 @@
                 />
                 <button
                   class="field-send"
-                  onclick="
-                    sendCmd(
-                      'LIP',
-                      Math.round(
-                        parseFloat(document.getElementById('lipInput').value) *
-                          100,
-                      ),
-                    )
-                  "
+                  onclick="cacheStartConfigFromUi()"
                 >
                   OK
                 </button>
@@ -1417,15 +1409,7 @@
                 />
                 <button
                   class="field-send"
-                  onclick="
-                    sendCmd(
-                      'LIE',
-                      Math.round(
-                        parseFloat(document.getElementById('lieInput').value) *
-                          100,
-                      ),
-                    )
-                  "
+                  onclick="cacheStartConfigFromUi()"
                 >
                   OK
                 </button>
@@ -1588,6 +1572,13 @@
         strategyLoaded: false,
         currentTab: 0,
         debugActive: false,
+        startConfig: {
+          vr: 200,
+          vg: 180,
+          hbe: 0,
+          lip: 10,
+          lie: -25,
+        },
         device: null,
         rxChar: null,
         txChar: null,
@@ -1634,6 +1625,7 @@
         renderStrategyList();
         updateActiveStrat();
         updateConnectionUI(false);
+        cacheStartConfigFromUi();
         // Activation UI removed; no-op
       });
 
@@ -1658,11 +1650,36 @@
       function handleSpeedInput(prefix, rawValue) {
         const value = syncSpeedControl(prefix, rawValue);
         if (value === null) return;
-        if (prefix === "vr") {
-          sendDebouncedVR(value);
-        } else {
-          sendDebouncedVG(value);
-        }
+        cacheStartConfigFromUi();
+      }
+
+      function readLimiterValue(id, fallback) {
+        const field = document.getElementById(id);
+        const parsed = field ? Number.parseFloat(field.value) : NaN;
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : fallback;
+      }
+
+      function readRobotStartConfig() {
+        return {
+          vr:
+            syncSpeedControl(
+              "vr",
+              document.getElementById("vrSlider")?.value ?? state.startConfig.vr,
+            ) ?? state.startConfig.vr,
+          vg:
+            syncSpeedControl(
+              "vg",
+              document.getElementById("vgSlider")?.value ?? state.startConfig.vg,
+            ) ?? state.startConfig.vg,
+          hbe: document.getElementById("hbeToggle")?.checked ? 1 : 0,
+          lip: readLimiterValue("lipInput", state.startConfig.lip),
+          lie: readLimiterValue("lieInput", state.startConfig.lie),
+        };
+      }
+
+      function cacheStartConfigFromUi() {
+        state.startConfig = readRobotStartConfig();
+        return state.startConfig;
       }
 
       // Activation UI removed: these are safe no-ops
@@ -1852,28 +1869,36 @@
       }
 
       async function sendCmd(cmd, value, options = {}) {
-        const { silent = false } = options;
+        const { silent = false, throwOnError = false } = options;
+        const fail = (message) => {
+          if (!silent) showToast(message);
+          if (throwOnError) throw new Error(message);
+          return false;
+        };
         const msg = `${cmd},${value},*`;
         if (state.demoMode) {
           console.log("[DEMO] send:", msg);
           handleDemoCmd(cmd, value);
           if (!silent) showToast(`Enviado: ${cmd}=${value}`);
-          return;
+          return true;
         }
         if (!state.connected) {
-          if (!silent) showToast("Não conectado");
-          return;
+          return fail("Não conectado");
         }
         try {
           // Use native Bluetooth to send command
           if (window.nativeSendCommand) {
             await window.nativeSendCommand(cmd, value);
             if (!silent) showToast(`Enviado: ${cmd}=${value}`);
+            return true;
           } else {
-            showToast("Native Bluetooth não disponível");
+            return fail("Native Bluetooth não disponível");
           }
         } catch (e) {
-          showToast("Erro ao enviar: " + e.message);
+          const err = e instanceof Error ? e : new Error(String(e));
+          if (!silent) showToast("Erro ao enviar: " + err.message);
+          if (throwOnError) throw err;
+          return false;
         }
       }
 
@@ -1924,6 +1949,8 @@
         const vr = document.getElementById("vrSlider").value;
         const vg = document.getElementById("vgSlider").value;
         const hbe = document.getElementById("hbeToggle").checked ? 1 : 0;
+        const lip = document.getElementById("lipInput").value;
+        const lie = document.getElementById("lieInput").value;
         const bat = (7.2 + Math.random() * 0.4).toFixed(2);
         const sd = Math.random() > 0.6 ? 1 : 0;
         const scd = Math.random() > 0.7 ? 1 : 0;
@@ -1931,7 +1958,7 @@
         const se = Math.random() > 0.6 ? 1 : 0;
         const ld = Math.floor(Math.random() * 4095);
         const le = Math.floor(Math.random() * 4095);
-        const line = `${vr}|${vg}|${hbe}|10|-25|${bat}|${sd}|${scd}|${sce}|${se}|${ld}|${le}`;
+        const line = `${vr}|${vg}|${hbe}|${Math.round(parseFloat(lip) * 100)}|${Math.round(parseFloat(lie) * 100)}|${bat}|${sd}|${scd}|${sce}|${se}|${ld}|${le}`;
         parseData(line);
       }
 
@@ -1943,6 +1970,15 @@
         if (cmd === "VG") {
           document.getElementById("vgVal").textContent = value;
           document.getElementById("vgSlider").value = value;
+        }
+        if (cmd === "HBE") {
+          document.getElementById("hbeToggle").checked = Number.parseInt(value, 10) === 1;
+        }
+        if (cmd === "LIP") {
+          document.getElementById("lipInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
+        }
+        if (cmd === "LIE") {
+          document.getElementById("lieInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
         }
         if (cmd === "EST") {
           state.selectedStrat = Number.parseInt(value, 10);
@@ -1974,6 +2010,9 @@
         syncSpeedControl("vg", vg);
         // Update toggle
         document.getElementById("hbeToggle").checked = parseInt(hbe) === 1;
+        document.getElementById("lipInput").value = (parseFloat(lip) / 100).toFixed(2);
+        document.getElementById("lieInput").value = (parseFloat(lie) / 100).toFixed(2);
+        cacheStartConfigFromUi();
         // Battery
         const batV = parseFloat(vbat);
         updateBattery(batV);
@@ -2072,20 +2111,36 @@
       // ACTIONS
       // ═══════════════════════════════════════════════════════
       function sendStrategy() {
-        sendCmd("EST", state.selectedStrat);
-        updateActiveStrat();
-        if (state.connected) {
-          setActivationState("Aguardando IR 0x0 → 0x1");
-        }
+        return iniciarRobo();
       }
 
-      function iniciarRobo() {
+      async function startRobotSequence() {
+        const config = cacheStartConfigFromUi();
+        await sendCmd("VR", config.vr, { silent: true, throwOnError: true });
+        await sendCmd("VG", config.vg, { silent: true, throwOnError: true });
+        await sendCmd("HBE", config.hbe, { silent: true, throwOnError: true });
+        if (config.hbe === 1) {
+          await sendCmd("LIP", config.lip, { silent: true, throwOnError: true });
+          await sendCmd("LIE", config.lie, { silent: true, throwOnError: true });
+        }
+        await sendCmd("EST", state.selectedStrat, {
+          silent: true,
+          throwOnError: true,
+        });
+        updateActiveStrat();
+      }
+
+      async function iniciarRobo() {
         if (!state.connected && !state.demoMode) {
           showToast("Robô não conectado!");
           return;
         }
-        sendCmd("EST", state.selectedStrat);
-        showToast("Iniciando robô (Estratégia " + state.selectedStrat + ")");
+        try {
+          await startRobotSequence();
+          showToast("Iniciando robô (Estratégia " + state.selectedStrat + ")");
+        } catch (e) {
+          showToast("Erro ao iniciar robô: " + (e.message || "falha no envio"));
+        }
       }
 
       function selectAppMode(mode) {
