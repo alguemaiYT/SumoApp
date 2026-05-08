@@ -1,7 +1,9 @@
 {
   "name": "SumoApp Workspace",
-  "dockerComposeFile": "../docker-compose.yml",
-  "service": "workspace",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
   "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {

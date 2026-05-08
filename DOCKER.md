@@ -42,7 +42,7 @@ O **ADB deve ser executado no host**, não dentro do container. Isso evita probl
 1. Conecte seu dispositivo Android ao computador.
 2. No seu **terminal do host**, execute:
    ```bash
-   adb install -r apk/SumoApp-debug-v2.0.0.apk
+   adb install -r apk/SumoApp-v4.apk
    ```
 
 ### Para ver os logs:
@@ -53,7 +53,7 @@ adb logcat
 
 ## Firmware ESP32
 
-Para fazer o upload do firmware, o `arduino-cli` está disponível no container para compilação. O upload (gravação) é recomendado ser feito pelo host se houver dificuldades com o mapeamento da porta serial no Docker, mas você pode tentar mapear o dispositivo no `docker-compose.yml` se necessário:
+Para fazer o upload do firmware, o `arduino-cli` está disponível no container para compilação. O core e as bibliotecas do ESP32 podem ser instalados sob demanda quando você for compilar o firmware. O upload (gravação) é recomendado ser feito pelo host se houver dificuldades com o mapeamento da porta serial no Docker, mas você pode tentar mapear o dispositivo no `docker-compose.yml` se necessário:
 
 ```yaml
 # docker-compose.yml (exemplo para Linux)

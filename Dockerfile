@@ -1,5 +1,5 @@
 # Docker-based development environment for SumoApp
-# Includes: Node.js, Java 17, Android SDK, and arduino-cli
+# Includes: Node.js, the distro default JDK, Android SDK, and arduino-cli
 
 FROM debian:stable-slim
 
@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     git \
-    openjdk-17-jdk \
+    default-jdk-headless \
     build-essential \
     python3 \
     wget \
@@ -26,7 +26,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Android SDK setup
 ENV ANDROID_HOME=/opt/android-sdk
-ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/34.0.0
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV PATH=$PATH:$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/34.0.0
 
 RUN mkdir -p $ANDROID_HOME/cmdline-tools \
     && wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip \
@@ -42,12 +43,11 @@ RUN yes | sdkmanager --licenses \
 # arduino-cli setup
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
 
-# Configure arduino-cli for ESP32
+# Configure arduino-cli for ESP32. Core/libraries are installed on demand to keep
+# the devcontainer build lightweight and avoid large archive extraction failures.
 RUN arduino-cli config init \
     && arduino-cli config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json \
-    && arduino-cli core update-index \
-    && arduino-cli core install esp32:esp32 \
-    && arduino-cli lib install "MPU6050" "IRremote" "I2Cdev"
+    && arduino-cli core update-index
 
 # Workspace setup
 WORKDIR /workspace

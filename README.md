@@ -33,7 +33,7 @@ Se você estiver continuando este projeto, aqui estão os detalhes críticos:
 - `/firmware/Sumo_Auto_ESP32_V2.ino/`: Arquivos `.ino` e `.h` do robô.
 - `/web/robo-control.html`: Fonte original da interface.
 - `/app/src/index.html`: Cópia de produção usada pelo Tauri.
-- `/apk/SumoApp.apk`: Binário compilado final.
+- `/apk/SumoApp-v4.apk`: Binário compilado final versionado.
 
 ## 🛰 Protocolo de Comunicação (Serial SPP)
 

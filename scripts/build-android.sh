@@ -15,11 +15,7 @@ cd android
 ./gradlew assembleDebug
 
 # Copy APK to /apk folder as per GEMINI.md
-VERSION=$(node -p "require('../package.json').version")
 APK_SRC="app/build/outputs/apk/debug/app-debug.apk"
-APK_DEST="/workspace/apk/SumoApp-debug-v${VERSION}.apk"
-
-mkdir -p /workspace/apk
-cp "$APK_SRC" "$APK_DEST"
+APK_DEST=$(bash /workspace/init "$APK_SRC" SumoApp)
 
 echo "Android APK built and copied to $APK_DEST"

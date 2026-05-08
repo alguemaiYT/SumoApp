@@ -1860,9 +1860,10 @@
       // BLUETOOTH (Native Capacitor adapter)
       // ═══════════════════════════════════════════════════════
       async function startConnect() {
-        const btn = document.getElementById("connectBtn");
-        btn.classList.add("connecting");
-        document.getElementById("connectLabel").textContent = "Procurando…";
+        const btn = document.getElementById("connect-btn");
+        if (btn) btn.classList.add("connecting");
+        const connectLabel = document.getElementById("connectLabel");
+        if (connectLabel) connectLabel.textContent = "Procurando…";
         try {
           // Use native Bluetooth discovery
           if (window.nativeStartConnect) {
@@ -1871,19 +1872,18 @@
             showToast("Bluetooth nativo não disponível");
           }
         } catch (e) {
-          btn.classList.remove("connecting");
-          document.getElementById("connectLabel").textContent =
-            "Conectar via Bluetooth";
+          if (btn) btn.classList.remove("connecting");
+          if (connectLabel) connectLabel.textContent = "Conectar via Bluetooth";
           showToast("Erro: " + (e.message || "falha na descoberta"));
         }
       }
       
       // Callback from native Bluetooth adapter when device is found and connected
       window.onNativeBluetoothConnected = function(data) {
-        const btn = document.getElementById("connectBtn");
-        btn.classList.remove("connecting");
-        document.getElementById("connectLabel").textContent =
-          "Conectar via Bluetooth";
+        const btn = document.getElementById("connect-btn");
+        if (btn) btn.classList.remove("connecting");
+        const connectLabel = document.getElementById("connectLabel");
+        if (connectLabel) connectLabel.textContent = "Conectar via Bluetooth";
         
         state.connected = true;
         state.demoMode = false;
@@ -2173,6 +2173,7 @@
           pill.style.color = "var(--success)";
           txt.textContent = "Conectado · IR pendente";
         }
+        goTab(mode === "demo" ? 0 : 1);
         updateActiveStrat();
         updateActivationSummary();
       }
@@ -2231,7 +2232,7 @@
           document.getElementById("nav1").style.display = "flex"; // Show Sensores tab button
           showToast("Modo Debug ativado");
         }
-        goTab(0); // Start at Estrategias
+        goTab(1); // Start at Configuração
       }
 
       function updateActiveStrat() {
