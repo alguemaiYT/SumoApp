@@ -13,7 +13,7 @@
     <link
       href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
-    />
+    />
     <style>
       :root {
         --bg: #080c14;
@@ -82,6 +82,7 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
+        gap: 12px;
         transition:
           opacity 0.5s,
           transform 0.5s;
@@ -161,6 +162,13 @@
         opacity: 0.7;
         pointer-events: none;
       }
+      .bt-btn.connecting .spinner {
+        display: block;
+      }
+      .bt-btn.connected {
+        background: var(--success);
+        color: #000;
+      }
       .bt-btn .spinner {
         width: 18px;
         height: 18px;
@@ -169,9 +177,6 @@
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
         display: none;
-      }
-      .bt-btn.connecting .spinner {
-        display: block;
       }
       .demo-btn {
         margin-top: 16px;
@@ -980,9 +985,69 @@
       .strategy-item.active {
         animation: gentle-glow 3s ease-in-out infinite;
       }
+      /* ─── LOG CONSOLE ─────────────────────────────────────── */
+      #log-console {
+        position: fixed;
+        bottom: calc(var(--safe-bot) + 75px);
+        left: 12px;
+        right: 12px;
+        height: 180px;
+        background: rgba(8, 12, 20, 0.95);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      }
+      #log-console.show {
+        display: flex;
+      }
+      .log-header {
+        padding: 8px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: var(--font-display);
+        font-size: 10px;
+        color: var(--accent);
+        letter-spacing: 1px;
+      }
+      .log-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: #fff;
+        line-height: 1.4;
+      }
+      .log-entry {
+        margin-bottom: 4px;
+        border-left: 2px solid var(--dim);
+        padding-left: 8px;
+      }
+      .log-time { color: var(--muted); margin-right: 6px; }
+      .log-error { border-left-color: var(--danger); color: #ff80ab; }
+      .log-warn { border-left-color: var(--accent); color: #ffe57f; }
+      .log-info { border-left-color: var(--accent2); color: #80d8ff; }
+
     </style>
+    <script type="module" crossorigin src="/assets/index-Dzhi-VWx.js"></script>
   </head>
   <body>
+    <!-- LOG CONSOLE -->
+    <div id="log-console">
+      <div class="log-header">
+        <span>SISTEMA > LOG_OUTPUT</span>
+        <button onclick="toggleLogs()" style="background:none; color:var(--muted); font-size:16px;">&times;</button>
+      </div>
+      <div id="log-content" class="log-content"></div>
+    </div>
     <!-- ═══════════════════ SPLASH SCREEN ═══════════════════ -->
     <div id="splash">
       <div class="splash-glow"></div>
@@ -1001,10 +1066,11 @@
         <img src="logo.png" alt="DragonBotz Logo" />
       </div>
       <div class="app-version">MadinBoo APP · v2.0</div>
-      <button class="bt-btn" id="connectBtn" onclick="startConnect()">
+      <button id="connect-btn" class="bt-btn" onclick="window.bluetoothAdapter?.handleBluetoothButtonClick()">
         <svg
-          width="17"
-          height="17"
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -1012,16 +1078,18 @@
         >
           <path d="M6.5 6.5l11 11M17.5 6.5L12 12l5.5 5.5M6.5 12H12" />
         </svg>
-        <span id="connectLabel">Conectar via Bluetooth</span>
+        <span id="connectLabel">Conectar Bluetooth</span>
         <div class="spinner"></div>
       </button>
       <button class="demo-btn" onclick="startDemo()">
         Entrar em modo demonstração
       </button>
-      <div class="splash-note">
-        Requer <span>BLE UART</span> (Nordic UART Service) no ESP32.<br />
-        Classic BT (SPP) não é suportado por navegadores web.
+      <div id="ble-info-box" style="background: var(--card2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 16px; margin-top: 32px; margin-bottom: 16px; text-align: center;">
+        <p style="color: var(--accent2); font-weight: 600; margin-bottom: 8px;">🔌 Bluetooth Clássico (SPP)</p>
+        <p style="color: var(--muted); font-size: 14px;">Conecte-se ao robô Madinboo através do Bluetooth nativo do Android.<br />A busca automática conectará o dispositivo rapidamente.</p>
       </div>
+      <div id="status-message" class="status-default" style="padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center; background: var(--card); color: var(--text); font-size: 14px; transition: all 0.3s; min-height: 20px;">Pronto para conectar</div>
+      <style>.status-default { background: var(--card); color: var(--text); } .status-success { background: rgba(0, 232, 122, 0.1); color: var(--success); } .status-error { background: rgba(255, 45, 85, 0.1); color: var(--danger); } .status-scanning { background: rgba(0, 212, 255, 0.1); color: var(--accent2); }</style>
     </div>
 
     <!-- ═══════════════════ MAIN APP ═══════════════════════ -->
@@ -1381,7 +1449,7 @@
                   <input
                     type="checkbox"
                     id="hbeToggle"
-                    onchange="sendCmd('HBE', this.checked ? 1 : 0)"
+                    onchange="cacheStartConfigFromUi()"
                   />
                   <div class="toggle-track"></div>
                   <div class="toggle-thumb"></div>
@@ -1403,15 +1471,7 @@
                 />
                 <button
                   class="field-send"
-                  onclick="
-                    sendCmd(
-                      'LIP',
-                      Math.round(
-                        parseFloat(document.getElementById('lipInput').value) *
-                          100,
-                      ),
-                    )
-                  "
+                  onclick="cacheStartConfigFromUi()"
                 >
                   OK
                 </button>
@@ -1428,15 +1488,7 @@
                 />
                 <button
                   class="field-send"
-                  onclick="
-                    sendCmd(
-                      'LIE',
-                      Math.round(
-                        parseFloat(document.getElementById('lieInput').value) *
-                          100,
-                      ),
-                    )
-                  "
+                  onclick="cacheStartConfigFromUi()"
                 >
                   OK
                 </button>
@@ -1599,6 +1651,13 @@
         strategyLoaded: false,
         currentTab: 0,
         debugActive: false,
+        startConfig: {
+          vr: 200,
+          vg: 180,
+          hbe: 0,
+          lip: 10,
+          lie: -25,
+        },
         device: null,
         rxChar: null,
         txChar: null,
@@ -1618,10 +1677,8 @@
         { id: 7, name: "Seg. Linha" },
       ];
 
-      // BLE Nordic UART Service UUIDs
-      const UART_SERVICE_UUID = "6e400001-b5b3-f393-e0a9-e50e24dcca9e";
-      const UART_TX_UUID = "6e400002-b5b3-f393-e0a9-e50e24dcca9e"; // write → robot
-      const UART_RX_UUID = "6e400003-b5b3-f393-e0a9-e50e24dcca9e"; // notify ← robot
+      // Note: BLE UART UUIDs are no longer used with native Capacitor Bluetooth
+      // The native bridge handles serial communication over Bluetooth Classic (SPP)
 
       // Utilitário de Debounce para não floodar o ESP32 ao arrastar os sliders
       function debounce(func, wait) {
@@ -1647,6 +1704,7 @@
         renderStrategyList();
         updateActiveStrat();
         updateConnectionUI(false);
+        cacheStartConfigFromUi();
         // Activation UI removed; no-op
       });
 
@@ -1671,11 +1729,36 @@
       function handleSpeedInput(prefix, rawValue) {
         const value = syncSpeedControl(prefix, rawValue);
         if (value === null) return;
-        if (prefix === "vr") {
-          sendDebouncedVR(value);
-        } else {
-          sendDebouncedVG(value);
-        }
+        cacheStartConfigFromUi();
+      }
+
+      function readLimiterValue(id, fallback) {
+        const field = document.getElementById(id);
+        const parsed = field ? Number.parseFloat(field.value) : NaN;
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : fallback;
+      }
+
+      function readRobotStartConfig() {
+        return {
+          vr:
+            syncSpeedControl(
+              "vr",
+              document.getElementById("vrSlider")?.value ?? state.startConfig.vr,
+            ) ?? state.startConfig.vr,
+          vg:
+            syncSpeedControl(
+              "vg",
+              document.getElementById("vgSlider")?.value ?? state.startConfig.vg,
+            ) ?? state.startConfig.vg,
+          hbe: document.getElementById("hbeToggle")?.checked ? 1 : 0,
+          lip: readLimiterValue("lipInput", state.startConfig.lip),
+          lie: readLimiterValue("lieInput", state.startConfig.lie),
+        };
+      }
+
+      function cacheStartConfigFromUi() {
+        state.startConfig = readRobotStartConfig();
+        return state.startConfig;
       }
 
       // Activation UI removed: these are safe no-ops
@@ -1774,66 +1857,59 @@
       }
 
       // ═══════════════════════════════════════════════════════
-      // BLUETOOTH
+      // BLUETOOTH (Native Capacitor adapter)
       // ═══════════════════════════════════════════════════════
       async function startConnect() {
-        if (!navigator.bluetooth) {
-          showToast("Web Bluetooth não disponível neste navegador");
-          return;
-        }
-        const btn = document.getElementById("connectBtn");
-        btn.classList.add("connecting");
-        document.getElementById("connectLabel").textContent = "Conectando…";
+        const btn = document.getElementById("connect-btn");
+        if (btn) btn.classList.add("connecting");
+        const connectLabel = document.getElementById("connectLabel");
+        if (connectLabel) connectLabel.textContent = "Procurando…";
         try {
-          const device = await navigator.bluetooth.requestDevice({
-            filters: [
-              { name: "Madinboo_BT" },
-              { services: [UART_SERVICE_UUID] },
-            ],
-            optionalServices: [UART_SERVICE_UUID],
-          });
-          state.device = device;
-          device.addEventListener("gattserverdisconnected", onDisconnected);
-          const server = await device.gatt.connect();
-          const service = await server.getPrimaryService(UART_SERVICE_UUID);
-          state.txChar = await service.getCharacteristic(UART_TX_UUID);
-          state.rxChar = await service.getCharacteristic(UART_RX_UUID);
-          await state.rxChar.startNotifications();
-          state.rxChar.addEventListener(
-            "characteristicvaluechanged",
-            onDataReceived,
-          );
-          state.connected = true;
-          state.demoMode = false;
-          launchApp("ble");
-          document.getElementById("modeOverlay").classList.remove("hide");
-          // activation UI removed
-          await sendCmd("LISTA", "", { silent: true });
-          await sendCmd("DEBUG", 1, { silent: true });
-          state.debugActive = true;
-        } catch (e) {
-          state.connected = false;
-          state.debugActive = false;
-          state.txChar = null;
-          state.rxChar = null;
-          if (
-            state.device &&
-            state.device.gatt &&
-            state.device.gatt.connected
-          ) {
-            try {
-              await state.device.gatt.disconnect();
-            } catch (_) {}
+          // Use native Bluetooth discovery
+          if (window.nativeStartConnect) {
+            await window.nativeStartConnect();
+          } else {
+            showToast("Bluetooth nativo não disponível");
           }
-          stopDemo();
-          updateConnectionUI(false);
-          // activation UI removed
-          btn.classList.remove("connecting");
-          document.getElementById("connectLabel").textContent =
-            "Conectar via Bluetooth";
-          showToast("Erro: " + (e.message || "conexão cancelada"));
+        } catch (e) {
+          if (btn) btn.classList.remove("connecting");
+          if (connectLabel) connectLabel.textContent = "Conectar via Bluetooth";
+          showToast("Erro: " + (e.message || "falha na descoberta"));
         }
       }
+      
+      // Callback from native Bluetooth adapter when device is found and connected
+      window.onNativeBluetoothConnected = function(data) {
+        const btn = document.getElementById("connect-btn");
+        if (btn) btn.classList.remove("connecting");
+        const connectLabel = document.getElementById("connectLabel");
+        if (connectLabel) connectLabel.textContent = "Conectar via Bluetooth";
+        
+        state.connected = true;
+        state.demoMode = false;
+        launchApp("ble");
+        document.getElementById("modeOverlay").classList.remove("hide");
+        
+        // Send initialization commands
+        sendCmd("LISTA", "", { silent: true });
+        sendCmd("DEBUG", 1, { silent: true });
+        state.debugActive = true;
+      };
+      
+      // Callback from native Bluetooth adapter on disconnect
+      window.onNativeBluetoothDisconnected = function() {
+        onDisconnected();
+      };
+      
+      // Callback from native Bluetooth adapter for incoming data
+      window.onNativeBluetoothData = function(line) {
+        parseData(line);
+      };
+      
+      // Callback for Bluetooth errors
+      window.onNativeBluetoothError = function(message) {
+        showToast("Bluetooth: " + message);
+      };
 
       function onDataReceived(evt) {
         const decoder = new TextDecoder();
@@ -1872,24 +1948,36 @@
       }
 
       async function sendCmd(cmd, value, options = {}) {
-        const { silent = false } = options;
+        const { silent = false, throwOnError = false } = options;
+        const fail = (message) => {
+          if (!silent) showToast(message);
+          if (throwOnError) throw new Error(message);
+          return false;
+        };
         const msg = `${cmd},${value},*`;
         if (state.demoMode) {
           console.log("[DEMO] send:", msg);
           handleDemoCmd(cmd, value);
           if (!silent) showToast(`Enviado: ${cmd}=${value}`);
-          return;
+          return true;
         }
-        if (!state.connected || !state.txChar) {
-          if (!silent) showToast("Não conectado");
-          return;
+        if (!state.connected) {
+          return fail("Não conectado");
         }
         try {
-          const encoder = new TextEncoder();
-          await state.txChar.writeValue(encoder.encode(msg));
-          if (!silent) showToast(`Enviado: ${cmd}=${value}`);
+          // Use native Bluetooth to send command
+          if (window.nativeSendCommand) {
+            await window.nativeSendCommand(cmd, value);
+            if (!silent) showToast(`Enviado: ${cmd}=${value}`);
+            return true;
+          } else {
+            return fail("Native Bluetooth não disponível");
+          }
         } catch (e) {
-          showToast("Erro ao enviar: " + e.message);
+          const err = e instanceof Error ? e : new Error(String(e));
+          if (!silent) showToast("Erro ao enviar: " + err.message);
+          if (throwOnError) throw err;
+          return false;
         }
       }
 
@@ -1898,9 +1986,14 @@
           stopDemo();
           return;
         }
-        if (state.device && state.device.gatt.connected) {
+        try {
           await sendCmd("DEBUG", 0, { silent: true });
-          await state.device.gatt.disconnect();
+          // Close native Bluetooth connection
+          if (window.nativeStopConnect) {
+            await window.nativeStopConnect();
+          }
+        } catch (e) {
+          console.error("Disconnect error:", e);
         }
         stopDemo();
       }
@@ -1935,6 +2028,8 @@
         const vr = document.getElementById("vrSlider").value;
         const vg = document.getElementById("vgSlider").value;
         const hbe = document.getElementById("hbeToggle").checked ? 1 : 0;
+        const lip = document.getElementById("lipInput").value;
+        const lie = document.getElementById("lieInput").value;
         const bat = (7.2 + Math.random() * 0.4).toFixed(2);
         const sd = Math.random() > 0.6 ? 1 : 0;
         const scd = Math.random() > 0.7 ? 1 : 0;
@@ -1942,7 +2037,7 @@
         const se = Math.random() > 0.6 ? 1 : 0;
         const ld = Math.floor(Math.random() * 4095);
         const le = Math.floor(Math.random() * 4095);
-        const line = `${vr}|${vg}|${hbe}|10|-25|${bat}|${sd}|${scd}|${sce}|${se}|${ld}|${le}`;
+        const line = `${vr}|${vg}|${hbe}|${Math.round(parseFloat(lip) * 100)}|${Math.round(parseFloat(lie) * 100)}|${bat}|${sd}|${scd}|${sce}|${se}|${ld}|${le}`;
         parseData(line);
       }
 
@@ -1954,6 +2049,15 @@
         if (cmd === "VG") {
           document.getElementById("vgVal").textContent = value;
           document.getElementById("vgSlider").value = value;
+        }
+        if (cmd === "HBE") {
+          document.getElementById("hbeToggle").checked = Number.parseInt(value, 10) === 1;
+        }
+        if (cmd === "LIP") {
+          document.getElementById("lipInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
+        }
+        if (cmd === "LIE") {
+          document.getElementById("lieInput").value = (Number.parseInt(value, 10) / 100).toFixed(2);
         }
         if (cmd === "EST") {
           state.selectedStrat = Number.parseInt(value, 10);
@@ -1985,6 +2089,9 @@
         syncSpeedControl("vg", vg);
         // Update toggle
         document.getElementById("hbeToggle").checked = parseInt(hbe) === 1;
+        document.getElementById("lipInput").value = (parseFloat(lip) / 100).toFixed(2);
+        document.getElementById("lieInput").value = (parseFloat(lie) / 100).toFixed(2);
+        cacheStartConfigFromUi();
         // Battery
         const batV = parseFloat(vbat);
         updateBattery(batV);
@@ -2066,6 +2173,7 @@
           pill.style.color = "var(--success)";
           txt.textContent = "Conectado · IR pendente";
         }
+        goTab(mode === "demo" ? 0 : 1);
         updateActiveStrat();
         updateActivationSummary();
       }
@@ -2083,20 +2191,36 @@
       // ACTIONS
       // ═══════════════════════════════════════════════════════
       function sendStrategy() {
-        sendCmd("EST", state.selectedStrat);
-        updateActiveStrat();
-        if (state.connected) {
-          setActivationState("Aguardando IR 0x0 → 0x1");
-        }
+        return iniciarRobo();
       }
 
-      function iniciarRobo() {
+      async function startRobotSequence() {
+        const config = cacheStartConfigFromUi();
+        await sendCmd("VR", config.vr, { silent: true, throwOnError: true });
+        await sendCmd("VG", config.vg, { silent: true, throwOnError: true });
+        await sendCmd("HBE", config.hbe, { silent: true, throwOnError: true });
+        if (config.hbe === 1) {
+          await sendCmd("LIP", config.lip, { silent: true, throwOnError: true });
+          await sendCmd("LIE", config.lie, { silent: true, throwOnError: true });
+        }
+        await sendCmd("EST", state.selectedStrat, {
+          silent: true,
+          throwOnError: true,
+        });
+        updateActiveStrat();
+      }
+
+      async function iniciarRobo() {
         if (!state.connected && !state.demoMode) {
           showToast("Robô não conectado!");
           return;
         }
-        sendCmd("EST", state.selectedStrat);
-        showToast("Iniciando robô (Estratégia " + state.selectedStrat + ")");
+        try {
+          await startRobotSequence();
+          showToast("Iniciando robô (Estratégia " + state.selectedStrat + ")");
+        } catch (e) {
+          showToast("Erro ao iniciar robô: " + (e.message || "falha no envio"));
+        }
       }
 
       function selectAppMode(mode) {
@@ -2108,7 +2232,7 @@
           document.getElementById("nav1").style.display = "flex"; // Show Sensores tab button
           showToast("Modo Debug ativado");
         }
-        goTab(0); // Start at Estrategias
+        goTab(1); // Start at Configuração
       }
 
       function updateActiveStrat() {

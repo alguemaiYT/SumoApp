@@ -14,16 +14,16 @@ O sistema permite monitorar sensores, bateria e ajustar estratégias de combate 
     - Design premium com tema escuro e elementos de glassmorphism.
     - Sistema de "Modo Batalha" que bloqueia a interface durante a luta.
     - Dashboards para Sensores, Bateria, IMU e PWM.
-3.  **/app**: Projeto **Tauri v2** para conversão da interface web em aplicativo nativo Android (.apk).
+3.  **/app**: Projeto **Capacitor** para empacotar a interface web em aplicativo nativo Android (.apk).
 
 ## 🛠 Contexto Tecnológico para IA
 Se você estiver continuando este projeto, aqui estão os detalhes críticos:
 
-### Interface Mobile (Tauri + Android)
+### Interface Mobile (Capacitor + Android)
 - A interface web foi otimizada para dispositivos móveis usando `100dvh` e `env(safe-area-inset-bottom)`.
 - O identificador do app é `com.kali.sumoapp`.
 - **Bluetooth**: O app utiliza a Web Bluetooth API no frontend com um loop de **Auto-Reconexão Contínua**. Ele monitora o evento `gattserverdisconnected` e tenta reconectar ao dispositivo a cada 2 segundos.
-- **Permissões**: O `AndroidManifest.xml` (em `app/src-tauri/gen/android/...`) foi modificado para incluir permissões de Bluetooth e Localização (necessário para o Android).
+- **Permissões**: O `AndroidManifest.xml` (em `app/android/app/src/main/`) inclui permissões de Bluetooth e Localização (necessário no Android).
 
 ### Lógica de Combate
 - **Save EEPROM**: Ao clicar em salvar, o app entra no estado `isInBattle`, ativando um overlay global vermelho "EM BATALHA!".
@@ -31,9 +31,9 @@ Se você estiver continuando este projeto, aqui estão os detalhes críticos:
 
 ## 📁 Estrutura de Pastas
 - `/firmware/Sumo_Auto_ESP32_V2.ino/`: Arquivos `.ino` e `.h` do robô.
-- `/web/robo-control.html`: Fonte original da interface.
-- `/app/src/index.html`: Cópia de produção usada pelo Tauri.
-- `/apk/SumoApp-v4.apk`: Binário compilado final versionado.
+- `/web/majinboo.html`: Espelho da interface HTML para referência rápida no diretório web.
+- `/app/src/index.html`: Fonte principal da interface usada no build do app.
+- `/apk/SumoApp-vN.apk`: APKs versionados sequencialmente para distribuição.
 
 ## 🛰 Protocolo de Comunicação (Serial SPP)
 
