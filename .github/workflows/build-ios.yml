@@ -1,0 +1,49 @@
+name: Build iOS (SumoApp BLE)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Prebuild & Compile iOS Simulator Archive
+    runs-on: macos-15
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: TypeScript & Jest
+        run: |
+          pnpm run type-check
+          pnpm run test:ci
+
+      - name: Expo prebuild (iOS)
+        env:
+          EXPO_PUBLIC_APP_ENV: production
+          STRICT_ENV_VALIDATION: '1'
+        run: pnpm exec expo prebuild --platform ios --clean
+
+      - name: CocoaPods install
+        working-directory: ios
+        run: pod install
+
+      - name: Build iOS (unsigned Simulator verification)
+        working-directory: ios
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
