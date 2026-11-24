@@ -345,7 +345,10 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       });
 
       if (s.autoConnect && !s.isSimulation) {
-        void transport.startAutoScan();
+        void transport.startAutoScan().catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'Erro ao iniciar scan BLE';
+          set({ phase: 'error', statusDetail: msg });
+        });
       }
     },
 

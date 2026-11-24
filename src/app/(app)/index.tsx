@@ -72,8 +72,13 @@ export default function DashboardScreen() {
   const currentStrat = STRATEGIES.find((s) => s.id === info.estrategia) ?? STRATEGIES[0];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#090D16]" edges={['top']}>
-      <ScrollView className="flex-1 px-4 pt-2" contentContainerClassName="pb-8 gap-3.5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#090D16' }} edges={['top']}>
+      <ScrollView
+        style={{ flex: 1 }}
+        className="flex-1 px-4 pt-2"
+        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerClassName="pb-8 gap-3.5"
+      >
         {/* Header */}
         <View className="flex-row items-center justify-between">
           <View>

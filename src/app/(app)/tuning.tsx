@@ -104,8 +104,13 @@ export default function TuningScreen() {
   }, [info.irStartDelayMs]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#090D16]" edges={['top']}>
-      <ScrollView className="flex-1 px-4 pt-2" contentContainerClassName="pb-8 gap-3.5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#090D16' }} edges={['top']}>
+      <ScrollView
+        style={{ flex: 1 }}
+        className="flex-1 px-4 pt-2"
+        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerClassName="pb-8 gap-3.5"
+      >
         <View>
           <Text className="text-xl font-bold text-slate-50">Ajustes & Perfis</Text>
           <Text className="text-xs text-slate-400">
