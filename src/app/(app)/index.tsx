@@ -3,6 +3,7 @@ import { ChevronRight, RotateCcw } from 'lucide-react-native';
 import * as React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 
+import { Robot3DViewport } from '@/components/sumo/Robot3DViewport';
 import { RobotRadarSvg } from '@/components/sumo/RobotRadarSvg';
 import { STRATEGIES } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
@@ -21,6 +22,7 @@ function fmtSigned(val: number, digits: number): string {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const [viewMode, setViewMode] = React.useState<'2d' | '3d'>('2d');
   const [imuMode, setImuMode] = React.useState<'deg' | 'accel'>('deg');
 
   const telemetry = useSumoStore((s) => s.telemetry);
@@ -60,15 +62,35 @@ export default function DashboardScreen() {
       style={[styles.screen, { backgroundColor: bg }]}
       contentContainerStyle={styles.container}
     >
-      {/* Hero Schematic Radar + Front Line Sensors */}
+      {/* Hero Schematic Radar (2D) or Live 3D Mini-Sumo + X/Y/Z Background Graph */}
       <View style={[styles.radarPanel, { backgroundColor: surface, borderColor: divider }]}>
         <View style={styles.radarTopRow}>
           <View style={styles.radarTitleCluster}>
-            <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
-            {isTilted ? (
+            <Text style={styles.microLabel}>
+              {viewMode === '3d' ? 'ATITUDE 3D' : 'RADAR'}
+            </Text>
+            <View style={[styles.modeSwitch, { borderColor: divider }]}>
+              <Pressable
+                onPress={() => setViewMode('2d')}
+                style={[styles.modeBtn, viewMode === '2d' && styles.modeBtnActive]}
+              >
+                <Text style={[styles.modeBtnText, viewMode === '2d' && styles.modeBtnTextActive]}>
+                  2D
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setViewMode('3d')}
+                style={[styles.modeBtn, viewMode === '3d' && styles.modeBtnActive]}
+              >
+                <Text style={[styles.modeBtnText, viewMode === '3d' && styles.modeBtnTextActive]}>
+                  3D
+                </Text>
+              </Pressable>
+            </View>
+            {isTilted && viewMode === '2d' ? (
               <View style={styles.tiltBadge}>
                 <Text style={styles.tiltBadgeText}>
-                  INCLINADO {fmtSigned(info.pitchDeg, 0)}°
+                  {fmtSigned(info.pitchDeg, 0)}°
                 </Text>
               </View>
             ) : null}
@@ -102,18 +124,22 @@ export default function DashboardScreen() {
           </Pressable>
         </View>
 
-        <RobotRadarSvg
-          senEsq={telemetry.sen_esq}
-          senCentroEsq={telemetry.sen_centro_esq}
-          senCentroDir={telemetry.sen_centro_dir}
-          senDir={telemetry.sen_dir}
-          sensorLE={telemetry.sensorLE}
-          sensorLD={telemetry.sensorLD}
-          thrLE={info.linhaLimiarEsq}
-          thrLD={info.linhaLimiarDir}
-          headingDeg={info.headingDeg}
-          highContrast={highContrast}
-        />
+        {viewMode === '3d' ? (
+          <Robot3DViewport height={278} highContrast={highContrast} />
+        ) : (
+          <RobotRadarSvg
+            senEsq={telemetry.sen_esq}
+            senCentroEsq={telemetry.sen_centro_esq}
+            senCentroDir={telemetry.sen_centro_dir}
+            senDir={telemetry.sen_dir}
+            sensorLE={telemetry.sensorLE}
+            sensorLD={telemetry.sensorLD}
+            thrLE={info.linhaLimiarEsq}
+            thrLD={info.linhaLimiarDir}
+            headingDeg={info.headingDeg}
+            highContrast={highContrast}
+          />
+        )}
       </View>
 
       {/* Clean Hairline State & Strategy Strip */}

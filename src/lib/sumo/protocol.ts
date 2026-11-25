@@ -165,6 +165,7 @@ export interface RobotInfoData {
   imuOnline: boolean;
   ax: number;
   ay: number;
+  az: number;
   gz: number;
   headingDeg: number;
   pitchDeg: number;
@@ -230,6 +231,7 @@ export const cmdRequestInfo = (): string => 'INFO*';
 export const cmdCalibrateAll = (): string => 'CAL*';
 export const cmdCalibrateImu = (): string => 'IMU_CAL*';
 export const cmdZeroYaw = (): string => 'ZERO_YAW*';
+export const cmdStreamTelemetry = (enabled: boolean): string => `STREAM,${enabled ? 1 : 0}*`;
 export const cmdResetConfig = (): string => 'RESET_CFG*';
 export const cmdBenchJog = (dir: BenchJogDirection): string => `${dir}*`;
 export const cmdBenchMotor = (side: BenchMotorSide, dir: BenchMotorDir): string =>
@@ -313,6 +315,8 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
 
   const ax = Number.parseFloat(map.ax ?? '0') || 0;
   const ay = Number.parseFloat(map.ay ?? '0') || 0;
+  const rawAz = map.az !== undefined ? Number.parseFloat(map.az) : Number.NaN;
+  const az = Number.isFinite(rawAz) ? rawAz : 9.81;
   const gz = Number.parseFloat(map.gz ?? '0') || 0;
   const headingDeg = Number.parseFloat(map.hdg ?? '0') || 0;
 
@@ -331,6 +335,7 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
     imuOnline: map.imu === '1',
     ax,
     ay,
+    az,
     gz,
     headingDeg,
     pitchDeg,

@@ -16,6 +16,7 @@ import {
   cmdStalledThreshold,
   cmdStraightSpeed,
   cmdStrategy,
+  cmdStreamTelemetry,
   cmdTurnSpeed,
   cmdZeroYaw,
   LineAccumulator,
@@ -58,6 +59,8 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdCalibrateAll()).toBe('CAL*');
     expect(cmdCalibrateImu()).toBe('IMU_CAL*');
     expect(cmdZeroYaw()).toBe('ZERO_YAW*');
+    expect(cmdStreamTelemetry(true)).toBe('STREAM,1*');
+    expect(cmdStreamTelemetry(false)).toBe('STREAM,0*');
     expect(cmdResetConfig()).toBe('RESET_CFG*');
     expect(cmdBenchJog('FRENTE')).toBe('FRENTE*');
     expect(cmdBenchJog('ESQ')).toBe('ESQ*');
@@ -95,9 +98,9 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(parseDadosLine('')).toBeNull();
   });
 
-  test('parses extended INFO* telemetry line with pitch/roll and legacy fallback', () => {
+  test('parses extended INFO* telemetry line with az, pitch/roll and legacy fallback', () => {
     const info = parseInfoLine(
-      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|gz=12.4|hdg=91.5|pitch=35.4|roll=-2.1|ldThr=410|leThr=420|ird=5000|fw=exper',
+      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|az=9.78|gz=12.4|hdg=91.5|pitch=35.4|roll=-2.1|ldThr=410|leThr=420|ird=5000|fw=exper',
       2000,
     );
     expect(info).toEqual({
@@ -106,6 +109,7 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
       imuOnline: true,
       ax: 0.12,
       ay: -0.05,
+      az: 9.78,
       gz: 12.4,
       headingDeg: 91.5,
       pitchDeg: 35.4,
@@ -117,11 +121,12 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
       timestamp: 2000,
     });
 
-    // Legacy firmware without pitch/roll estimates from ax/ay
+    // Legacy firmware without az/pitch/roll estimates from ax/ay and defaults az=9.81
     const legacy = parseInfoLine(
       'INFO|est=1|state=0|imu=1|ax=4.905|ay=0.00|gz=0.0|hdg=0.0|ldThr=250|leThr=250|ird=0|fw=debug',
       2100,
     );
+    expect(legacy?.az).toBe(9.81);
     expect(legacy?.pitchDeg).toBe(30);
     expect(legacy?.rollDeg).toBe(0);
   });

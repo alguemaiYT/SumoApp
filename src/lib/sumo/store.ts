@@ -29,6 +29,7 @@ import {
   cmdStalledThreshold,
   cmdStraightSpeed,
   cmdStrategy,
+  cmdStreamTelemetry,
   cmdTurnSpeed,
   cmdZeroYaw,
   DEFAULT_DEVICE_NAME,
@@ -116,6 +117,7 @@ const DEFAULT_INFO: RobotInfoData = {
   imuOnline: false,
   ax: 0,
   ay: 0,
+  az: 9.81,
   gz: 0,
   headingDeg: 0,
   pitchDeg: 0,
@@ -143,6 +145,7 @@ interface SumoStore {
   autoConnect: boolean;
   highContrast: boolean;
   hapticOnDetect: boolean;
+  stream3dActive: boolean;
   activePulseMotor: string | null;
   sensorLatch: SensorLatchCounts;
   lastDeviceId: string | null;
@@ -180,6 +183,7 @@ interface SumoStore {
   calibrateAll: () => Promise<void>;
   calibrateImu: () => Promise<void>;
   zeroYaw: () => Promise<void>;
+  setStream3d: (enabled: boolean) => Promise<void>;
   resetRobotConfig: () => Promise<void>;
   benchJog: (dir: BenchJogDirection) => Promise<void>;
   benchMotorPulse: (side: BenchMotorSide, dir: BenchMotorDir, durationMs?: number) => Promise<void>;
@@ -285,11 +289,16 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         const raw = `${t.velocreta}|${t.velocgiro}|${t.HBEvasao ? 1 : 0}|${t.limiarParado}|${t.limiarEmpurrado}|${simVbat}|0|${activeCenter}|${activeCenter}|0|${1980 + (pollTick % 40)}|${2020 - (pollTick % 35)}`;
         handleIncomingLine(raw);
         const inf = state.info;
-        const simPitch = Number((Math.sin(pollTick / 6) * 2.4).toFixed(1));
-        const simRoll = Number((Math.cos(pollTick / 7) * 1.1).toFixed(1));
+        const simPitch = Number((Math.sin(pollTick / 5) * 14.0).toFixed(1));
+        const simRoll = Number((Math.cos(pollTick / 6) * 7.5).toFixed(1));
+        const simAz = Number((9.81 * Math.cos((simPitch * Math.PI) / 180)).toFixed(2));
         handleIncomingLine(
-          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|gz=0.3|hdg=${((pollTick * 3) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper`,
+          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|az=${simAz}|gz=0.3|hdg=${((pollTick * 4) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper`,
         );
+        return;
+      }
+      // When high-rate firmware STREAM,1* is active, ESP32 pushes ~16 Hz INFO + ~8 Hz dados
+      if (state.stream3dActive) {
         return;
       }
       void transport?.sendCommand(cmdRequestTelemetry());
@@ -355,6 +364,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     autoConnect: savedAuto ?? true,
     highContrast: savedHighContrast ?? false,
     hapticOnDetect: false,
+    stream3dActive: false,
     activePulseMotor: null,
     sensorLatch: DEFAULT_SENSOR_LATCH,
     lastDeviceId: savedLastId,
@@ -390,6 +400,9 @@ export const useSumoStore = create<SumoStore>((set, get) => {
           appendLog('sys', `Conectado a ${dev.name} (${dev.id})`);
           void transport?.sendCommand(cmdRequestInfo());
           void transport?.sendCommand(cmdRequestTelemetry());
+          if (get().stream3dActive) {
+            void transport?.sendCommand(cmdStreamTelemetry(true));
+          }
           startPolling();
         },
         onDisconnected: (wasCombat) => {
@@ -542,6 +555,14 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     zeroYaw: async () => {
       await sendCmd(cmdZeroYaw());
+    },
+
+    setStream3d: async (enabled) => {
+      set({ stream3dActive: enabled });
+      const s = get();
+      if (!s.isSimulation && s.phase === 'connected' && transport) {
+        await transport.sendCommand(cmdStreamTelemetry(enabled));
+      }
     },
 
     resetRobotConfig: async () => {
