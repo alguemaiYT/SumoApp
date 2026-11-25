@@ -1,338 +1,295 @@
-import {
-  BatteryCharging,
-  Bluetooth,
-  BluetoothConnected,
-  BluetoothOff,
-  Compass,
-  OctagonAlert,
-  Radio,
-  RefreshCw,
-} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import * as React from 'react';
-import {
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  Vibration,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { ConnectionPhase } from '@/lib/sumo/ble-transport';
-import { MATCH_STATE_LABELS, STRATEGIES } from '@/lib/sumo/protocol';
+import { RobotRadarSvg } from '@/components/sumo/RobotRadarSvg';
+import { STRATEGIES } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
 
-function phaseBadge(phase: ConnectionPhase): { label: string; bg: string; fg: string } {
-  switch (phase) {
-    case 'connected':
-      return { label: 'CONECTADO', bg: 'bg-emerald-500/20', fg: 'text-emerald-400' };
-    case 'scanning':
-      return { label: 'BUSCANDO BLE...', bg: 'bg-sky-500/20', fg: 'text-sky-400' };
-    case 'connecting':
-      return { label: 'CONECTANDO...', bg: 'bg-amber-500/20', fg: 'text-amber-400' };
-    case 'in_combat':
-      return { label: 'EM COMBATE (BLE OFF)', bg: 'bg-orange-500/20', fg: 'text-orange-400' };
-    case 'bluetooth_off':
-      return { label: 'BLUETOOTH DESLIGADO', bg: 'bg-rose-500/20', fg: 'text-rose-400' };
-    case 'permissions_denied':
-      return { label: 'SEM PERMISSÃO', bg: 'bg-rose-500/20', fg: 'text-rose-400' };
-    case 'error':
-      return { label: 'ERRO BLE', bg: 'bg-rose-500/20', fg: 'text-rose-400' };
-    default:
-      return { label: 'DESCONECTADO', bg: 'bg-slate-700/60', fg: 'text-slate-300' };
-  }
-}
+const SHORT_MATCH_STATE: Record<number, string> = {
+  0: 'IDLE',
+  1: 'READY',
+  2: 'COMBATE',
+  3: 'STOP',
+};
 
 export default function DashboardScreen() {
-  const phase = useSumoStore((s) => s.phase);
-  const statusDetail = useSumoStore((s) => s.statusDetail);
-  const isSimulation = useSumoStore((s) => s.isSimulation);
-  const autoConnect = useSumoStore((s) => s.autoConnect);
-  const connectedDevice = useSumoStore((s) => s.connectedDevice);
-  const discoveredDevices = useSumoStore((s) => s.discoveredDevices);
+  const router = useRouter();
   const telemetry = useSumoStore((s) => s.telemetry);
   const info = useSumoStore((s) => s.info);
+  const highContrast = useSumoStore((s) => s.highContrast);
 
-  const startAutoConnect = useSumoStore((s) => s.startAutoConnect);
-  const connectDevice = useSumoStore((s) => s.connectDevice);
-  const disconnect = useSumoStore((s) => s.disconnect);
-  const setAutoConnect = useSumoStore((s) => s.setAutoConnect);
-  const toggleSimulation = useSumoStore((s) => s.toggleSimulation);
-  const emergencyStop = useSumoStore((s) => s.emergencyStop);
-
-  const badge = phaseBadge(phase);
-  const vbat = telemetry.Vbat;
-  const vbatPct = Math.max(0, Math.min(100, ((vbat - 6.4) / (8.4 - 6.4)) * 100));
-  const vbatColor =
-    vbat === 0 ? 'text-slate-400' : vbat >= 7.6 ? 'text-emerald-400' : vbat >= 7.2 ? 'text-amber-400' : 'text-rose-400';
-
-  const ldOnWhite = telemetry.sensorLD <= info.linhaLimiarDir;
-  const leOnWhite = telemetry.sensorLE <= info.linhaLimiarEsq;
   const currentStrat = STRATEGIES.find((s) => s.id === info.estrategia) ?? STRATEGIES[0];
+  const stateLabel = SHORT_MATCH_STATE[info.matchState] ?? 'IDLE';
+  const isActiveCombat = info.matchState === 1 || info.matchState === 2;
+
+  const bg = highContrast ? '#000000' : '#09090B';
+  const surface = highContrast ? '#111114' : '#121215';
+  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#090D16' }} edges={['top']}>
-      <ScrollView
-        style={{ flex: 1 }}
-        className="flex-1 px-4 pt-2"
-        contentContainerStyle={{ paddingBottom: 32 }}
-        contentContainerClassName="pb-8 gap-3.5"
+    <ScrollView
+      style={[styles.screen, { backgroundColor: bg }]}
+      contentContainerStyle={styles.container}
+    >
+      {/* Hero Schematic Radar + Front Line Sensors */}
+      <View style={[styles.radarPanel, { backgroundColor: surface, borderColor: divider }]}>
+        <View style={styles.radarHeader}>
+          <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
+          <Text style={styles.microValue}>
+            {info.firmwareBranch !== 'unknown' ? info.firmwareBranch.toUpperCase() : 'BLE NUS'}
+          </Text>
+        </View>
+
+        <RobotRadarSvg
+          senEsq={telemetry.sen_esq}
+          senCentroEsq={telemetry.sen_centro_esq}
+          senCentroDir={telemetry.sen_centro_dir}
+          senDir={telemetry.sen_dir}
+          sensorLE={telemetry.sensorLE}
+          sensorLD={telemetry.sensorLD}
+          thrLE={info.linhaLimiarEsq}
+          thrLD={info.linhaLimiarDir}
+          highContrast={highContrast}
+        />
+      </View>
+
+      {/* Clean Hairline State & Strategy Strip */}
+      <Pressable
+        onPress={() => router.push('/strategies')}
+        style={[styles.stripRow, { borderColor: divider }]}
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-xl font-bold text-slate-50">SumoApp BLE</Text>
-            <Text className="text-xs text-slate-400">
-              Sumo_Auto_ESP32 • {info.firmwareBranch !== 'unknown' ? `branch ${info.firmwareBranch}` : 'BLE NUS Android & iOS'}
-            </Text>
-          </View>
-          <View className={`rounded-full px-3 py-1 ${badge.bg}`}>
-            <Text className={`text-[11px] font-bold ${badge.fg}`}>{badge.label}</Text>
-          </View>
-        </View>
-
-        {/* Connection Card */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 gap-3">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2.5 flex-1">
-              {phase === 'connected' ? (
-                <BluetoothConnected color="#34D399" size={22} />
-              ) : phase === 'bluetooth_off' ? (
-                <BluetoothOff color="#F87171" size={22} />
-              ) : (
-                <Bluetooth color="#38BDF8" size={22} />
-              )}
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-slate-100">
-                  {connectedDevice ? connectedDevice.name : 'Madinboo_BT (BLE)'}
-                </Text>
-                <Text className="text-xs text-slate-400" numberOfLines={2}>
-                  {statusDetail || 'Conexão automática por serviço Nordic UART'}
-                </Text>
-              </View>
-            </View>
-            {phase === 'connected' ? (
-              <Pressable
-                onPress={() => void disconnect()}
-                className="rounded-xl bg-slate-800 px-3 py-2 active:opacity-75"
-              >
-                <Text className="text-xs font-semibold text-slate-200">Desconectar</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => void startAutoConnect()}
-                className="flex-row items-center gap-1.5 rounded-xl bg-orange-600 px-3 py-2 active:opacity-80"
-              >
-                <RefreshCw color="#FFF" size={14} />
-                <Text className="text-xs font-bold text-white">Conectar</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <View className="flex-row items-center justify-between border-t border-slate-800 pt-2.5">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-xs text-slate-300">Auto-reconectar</Text>
-              <Switch
-                value={autoConnect}
-                onValueChange={setAutoConnect}
-                trackColor={{ false: '#334155', true: '#EA580C' }}
-                thumbColor="#F8FAFC"
-              />
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Text className="text-xs text-slate-300">Simulador</Text>
-              <Switch
-                value={isSimulation}
-                onValueChange={toggleSimulation}
-                trackColor={{ false: '#334155', true: '#0284C7' }}
-                thumbColor="#F8FAFC"
-              />
-            </View>
-          </View>
-
-          {discoveredDevices.length > 0 && phase !== 'connected' ? (
-            <View className="gap-1.5 border-t border-slate-800 pt-2">
-              <Text className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Dispositivos BLE encontrados
-              </Text>
-              {discoveredDevices.map((d) => (
-                <Pressable
-                  key={d.id}
-                  onPress={() => void connectDevice(d)}
-                  className="flex-row items-center justify-between rounded-xl bg-slate-900 px-3 py-2.5 active:opacity-75"
-                >
-                  <Text className="text-xs font-semibold text-slate-100">{d.name}</Text>
-                  <Text className="text-xs font-mono text-slate-400">
-                    {d.rssi !== null ? `${d.rssi} dBm` : 'Toque para conectar'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* Match State & Battery Row */}
-        <View className="flex-row gap-3">
-          <View className="flex-1 rounded-2xl border border-slate-800 bg-[#111827] p-3.5 gap-1.5">
-            <View className="flex-row items-center gap-1.5">
-              <BatteryCharging color="#34D399" size={16} />
-              <Text className="text-xs font-semibold text-slate-400">Bateria (Vbat)</Text>
-            </View>
-            <Text className={`text-2xl font-bold font-mono ${vbatColor}`}>
-              {vbat > 0 ? `${vbat.toFixed(2)} V` : '--.- V'}
-            </Text>
-            <View className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-              <View
-                className={`h-full rounded-full ${vbat >= 7.6 ? 'bg-emerald-500' : vbat >= 7.2 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                style={{ width: `${vbatPct}%` }}
-              />
-            </View>
-            <Text className="text-[10px] text-slate-500">2S LiPo: 6.4 V mín • 8.4 V cheia</Text>
-          </View>
-
-          <View className="flex-1 rounded-2xl border border-slate-800 bg-[#111827] p-3.5 justify-between">
-            <View className="flex-row items-center gap-1.5">
-              <Radio color="#FB923C" size={16} />
-              <Text className="text-xs font-semibold text-slate-400">Estado / Tática</Text>
-            </View>
-            <Text className="text-xs font-bold text-orange-400">
-              {MATCH_STATE_LABELS[info.matchState]}
-            </Text>
-            <View>
-              <Text className="text-sm font-bold text-slate-100">
-                #{currentStrat.id} {currentStrat.name}
-              </Text>
-              <Text className="text-[10px] text-slate-400">
-                VR {telemetry.velocreta} • VG {telemetry.velocgiro} • IR {info.irStartDelayMs / 1000}s
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Visual Robot Sensor Map */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 gap-3">
-          <Text className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Sensores de Oponente (IR) & Borda (ADC)
+        <View style={styles.stripLeft}>
+          <View
+            style={[
+              styles.stateDot,
+              {
+                backgroundColor:
+                  info.matchState === 3
+                    ? '#EF4444'
+                    : isActiveCombat
+                      ? '#FF4D00'
+                      : '#A1A1AA',
+              },
+            ]}
+          />
+          <Text style={styles.stateText}>{stateLabel}</Text>
+          <Text style={styles.metaSep}>·</Text>
+          <Text style={styles.metaMono}>
+            VR {telemetry.velocreta} / VG {telemetry.velocgiro}
           </Text>
-
-          {/* 4 Opponent IR Sensors */}
-          <View className="flex-row justify-between gap-2">
-            {[
-              { label: 'SE (32)', active: telemetry.sen_esq === 1 },
-              { label: 'SCE (33)', active: telemetry.sen_centro_esq === 1 },
-              { label: 'SCD (25)', active: telemetry.sen_centro_dir === 1 },
-              { label: 'SD (26)', active: telemetry.sen_dir === 1 },
-            ].map((s) => (
-              <View
-                key={s.label}
-                className={`flex-1 items-center rounded-xl border py-3 ${
-                  s.active
-                    ? 'border-orange-500 bg-orange-500/20'
-                    : 'border-slate-800 bg-slate-900'
-                }`}
-              >
-                <View
-                  className={`mb-1.5 h-3 w-3 rounded-full ${
-                    s.active ? 'bg-orange-400' : 'bg-slate-700'
-                  }`}
-                />
-                <Text className="text-[11px] font-bold text-slate-200">{s.label}</Text>
-                <Text className={`text-[10px] font-mono ${s.active ? 'text-orange-300' : 'text-slate-500'}`}>
-                  {s.active ? 'ALVO' : 'LIVRE'}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* 2 Line Sensors */}
-          <View className="flex-row gap-3">
-            {[
-              {
-                label: 'Linha Esq (LE • GPIO 35)',
-                value: telemetry.sensorLE,
-                thr: info.linhaLimiarEsq,
-                white: leOnWhite,
-              },
-              {
-                label: 'Linha Dir (LD • GPIO 27)',
-                value: telemetry.sensorLD,
-                thr: info.linhaLimiarDir,
-                white: ldOnWhite,
-              },
-            ].map((ls) => (
-              <View
-                key={ls.label}
-                className={`flex-1 rounded-xl border p-3 ${
-                  ls.white ? 'border-rose-500 bg-rose-500/15' : 'border-slate-800 bg-slate-900'
-                }`}
-              >
-                <Text className="text-[10px] font-semibold text-slate-400">{ls.label}</Text>
-                <View className="mt-1 flex-row items-baseline justify-between">
-                  <Text className="text-lg font-bold font-mono text-slate-100">{ls.value}</Text>
-                  <Text className={`text-[10px] font-bold ${ls.white ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    {ls.white ? 'BORDA!' : 'PRETO'}
-                  </Text>
-                </View>
-                <Text className="text-[10px] font-mono text-slate-500">Limiar ≤ {ls.thr}</Text>
-              </View>
-            ))}
-          </View>
         </View>
 
-        {/* IMU Live Card */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 gap-2.5">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Compass color="#38BDF8" size={18} />
-              <Text className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                IMU 6-DOF (MPU6050)
-              </Text>
-            </View>
+        <View style={styles.stripRight}>
+          <Text style={styles.stratSummary}>
+            #{currentStrat.id} {currentStrat.name} · IR {info.irStartDelayMs / 1000}s
+          </Text>
+          <ChevronRight color="#71717A" size={16} />
+        </View>
+      </Pressable>
+
+      {/* Flat 4-Column IMU Table */}
+      <View style={[styles.imuSection, { borderColor: divider }]}>
+        <View style={styles.imuHeader}>
+          <Text style={styles.microLabel}>IMU · MPU6050</Text>
+          <View style={styles.imuStatusWrap}>
             <View
-              className={`rounded-full px-2.5 py-0.5 ${
-                info.imuOnline ? 'bg-emerald-500/20' : 'bg-rose-500/20'
-              }`}
-            >
-              <Text
-                className={`text-[10px] font-bold ${
-                  info.imuOnline ? 'text-emerald-400' : 'text-rose-400'
-                }`}
-              >
-                {info.imuOnline ? 'ONLINE (0x68)' : 'OFFLINE'}
-              </Text>
-            </View>
-          </View>
-
-          <View className="flex-row justify-between gap-2">
-            {[
-              { k: 'ax', v: `${info.ax.toFixed(2)} m/s²` },
-              { k: 'ay', v: `${info.ay.toFixed(2)} m/s²` },
-              { k: 'gz', v: `${info.gz.toFixed(1)} °/s` },
-              { k: 'Yaw', v: `${info.headingDeg.toFixed(1)}°` },
-            ].map((item) => (
-              <View key={item.k} className="flex-1 rounded-xl bg-slate-900 p-2.5 items-center">
-                <Text className="text-[10px] text-slate-500">{item.k}</Text>
-                <Text className="text-xs font-bold font-mono text-slate-100">{item.v}</Text>
-              </View>
-            ))}
+              style={[
+                styles.imuDot,
+                { backgroundColor: info.imuOnline ? '#22C55E' : '#EF4444' },
+              ]}
+            />
+            <Text style={[styles.imuStatusText, { color: info.imuOnline ? '#A1A1AA' : '#EF4444' }]}>
+              {info.imuOnline ? 'ONLINE' : 'OFFLINE'}
+            </Text>
           </View>
         </View>
 
-        {/* Quick Emergency Stop */}
-        <Pressable
-          onPress={() => {
-            Vibration.vibrate(120);
-            void emergencyStop();
-          }}
-          className="flex-row items-center justify-center gap-2 rounded-2xl bg-rose-600 py-4 active:opacity-80"
-        >
-          <OctagonAlert color="#FFF" size={20} />
-          <Text className="text-sm font-extrabold tracking-wide text-white">
-            PARADA DE EMERGÊNCIA (PARADA*)
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={[styles.imuTable, { borderTopColor: divider }]}>
+          {[
+            { k: 'AX', val: info.ax.toFixed(2), unit: 'm/s²' },
+            { k: 'AY', val: info.ay.toFixed(2), unit: 'm/s²' },
+            { k: 'GZ', val: info.gz.toFixed(1), unit: '°/s' },
+            { k: 'YAW', val: info.headingDeg.toFixed(1), unit: '°' },
+          ].map((col, idx) => (
+            <View
+              key={col.k}
+              style={[
+                styles.imuCell,
+                idx > 0 && { borderLeftWidth: 1, borderLeftColor: divider },
+              ]}
+            >
+              <Text style={styles.imuKey}>{col.k}</Text>
+              <Text style={styles.imuVal} numberOfLines={1}>
+                {col.val}
+              </Text>
+              <Text style={styles.imuUnit}>{col.unit}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Compact Telemetry Footnote */}
+      <View style={styles.footerRow}>
+        <Text style={styles.footerText}>
+          Evasão IMU: {telemetry.HBEvasao ? 'ATIVA' : 'OFF'}
+        </Text>
+        <Text style={styles.footerMono}>
+          LIP {telemetry.limiarParado.toFixed(2)} · LIE {telemetry.limiarEmpurrado.toFixed(2)}
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  container: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  radarPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  radarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  microLabel: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  microValue: {
+    color: '#A1A1AA',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 0.6,
+  },
+  stripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  stripLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stateDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  stateText: {
+    color: '#FAFAFA',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  metaSep: {
+    color: '#52525B',
+    fontSize: 12,
+  },
+  metaMono: {
+    color: '#A1A1AA',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
+  },
+  stripRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stratSummary: {
+    color: '#FAFAFA',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  imuSection: {
+    borderBottomWidth: 1,
+    paddingBottom: 10,
+  },
+  imuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  imuStatusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  imuDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  imuStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  imuTable: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingTop: 10,
+  },
+  imuCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 2,
+    gap: 2,
+  },
+  imuKey: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  imuVal: {
+    color: '#FAFAFA',
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
+  },
+  imuUnit: {
+    color: '#71717A',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 2,
+  },
+  footerText: {
+    color: '#71717A',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  footerMono: {
+    color: '#71717A',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
+  },
+});

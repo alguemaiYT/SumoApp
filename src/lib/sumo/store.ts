@@ -85,6 +85,7 @@ const DEFAULT_MEASUREMENTS: MeasurementRecord = {
 const STORAGE_KEYS = {
   lastDeviceId: 'sumo.lastDeviceId',
   autoConnect: 'sumo.autoConnect',
+  highContrast: 'sumo.highContrast',
   measurements: 'sumo.measurements',
 } as const;
 
@@ -124,6 +125,7 @@ interface SumoStore {
   statusDetail: string;
   isSimulation: boolean;
   autoConnect: boolean;
+  highContrast: boolean;
   lastDeviceId: string | null;
   connectedDevice: DiscoveredRobot | null;
   discoveredDevices: DiscoveredRobot[];
@@ -138,6 +140,7 @@ interface SumoStore {
   connectDevice: (device: DiscoveredRobot) => Promise<void>;
   disconnect: () => Promise<void>;
   setAutoConnect: (enabled: boolean) => void;
+  setHighContrast: (enabled: boolean) => void;
   toggleSimulation: (enabled: boolean) => void;
 
   // Robot commands
@@ -282,13 +285,15 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
   const savedLastId = getItem<string>(STORAGE_KEYS.lastDeviceId);
   const savedAuto = getItem<boolean>(STORAGE_KEYS.autoConnect);
+  const savedHighContrast = getItem<boolean>(STORAGE_KEYS.highContrast);
   const savedMeasurements = getItem<MeasurementRecord>(STORAGE_KEYS.measurements);
 
   return {
     phase: 'disconnected',
-    statusDetail: 'Pronto para conectar via BLE (Android & iOS)',
+    statusDetail: 'Pronto para conectar',
     isSimulation: false,
     autoConnect: savedAuto ?? true,
+    highContrast: savedHighContrast ?? false,
     lastDeviceId: savedLastId,
     connectedDevice: null,
     discoveredDevices: [],
@@ -387,6 +392,11 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       if (enabled && get().phase === 'disconnected' && !get().isSimulation) {
         void transport?.startAutoScan();
       }
+    },
+
+    setHighContrast: (enabled) => {
+      void setItem(STORAGE_KEYS.highContrast, enabled);
+      set({ highContrast: enabled });
     },
 
     toggleSimulation: (enabled) => {

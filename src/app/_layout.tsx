@@ -30,15 +30,15 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   );
 }
 
-const SumoDarkTheme = {
+const SumoCarbonTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    primary: '#FF6C00',
-    background: '#090D16',
-    card: '#111827',
-    text: '#F8FAFC',
-    border: '#1F2937',
+    primary: '#FF4D00',
+    background: '#09090B',
+    card: '#121215',
+    text: '#FAFAFA',
+    border: '#27272A',
     notification: '#EF4444',
   },
 };
@@ -58,7 +58,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <ThemeProvider value={SumoDarkTheme}>
+        <ThemeProvider value={SumoCarbonTheme}>
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(app)" />
@@ -73,11 +73,11 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#090D16',
+    backgroundColor: '#09090B',
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: '#090D16',
+    backgroundColor: '#09090B',
     padding: 20,
     paddingTop: 64,
   },
@@ -85,25 +85,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   errorTitle: {
-    color: '#F87171',
-    fontSize: 18,
+    color: '#EF4444',
+    fontSize: 16,
     fontWeight: '700',
   },
   errorText: {
-    color: '#F8FAFC',
+    color: '#FAFAFA',
     fontSize: 14,
   },
   errorStack: {
-    color: '#94A3B8',
+    color: '#A1A1AA',
     fontSize: 11,
     fontFamily: 'monospace',
   },
   retryButton: {
     marginTop: 12,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF4D00',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 6,
     alignItems: 'center',
   },
   retryText: {

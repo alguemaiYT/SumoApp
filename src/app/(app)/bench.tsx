@@ -4,12 +4,10 @@ import {
   ArrowRight,
   ArrowUp,
   Compass,
-  OctagonAlert,
   Send,
   Share2,
   Square,
   Target,
-  Terminal,
   Trash2,
 } from 'lucide-react-native';
 import * as React from 'react';
@@ -17,44 +15,61 @@ import {
   Pressable,
   ScrollView,
   Share,
+  StyleSheet,
   Switch,
   Text,
   TextInput,
   Vibration,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSumoStore } from '@/lib/sumo/store';
 
-function MeasureField({
+type BenchTab = 'controle' | 'calibracao' | 'ficha';
+
+function SpecRow({
   label,
   value,
+  unit,
   placeholder,
   onChangeText,
+  dividerColor,
 }: {
   label: string;
   value: string;
+  unit?: string;
   placeholder: string;
   onChangeText: (v: string) => void;
+  dividerColor: string;
 }) {
   return (
-    <View className="flex-1 min-w-[45%] gap-1">
-      <Text className="text-[10px] font-semibold text-slate-400">{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#475569"
-        className="h-9 rounded-lg border border-slate-700 bg-[#090D16] px-2.5 font-mono text-xs text-slate-100"
-      />
+    <View style={[styles.specRow, { borderBottomColor: dividerColor }]}>
+      <Text style={styles.specLabel}>{label}</Text>
+      <View style={styles.specInputWrap}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#52525B"
+          style={styles.specInput}
+        />
+        {unit ? <Text style={styles.specUnit}>{unit}</Text> : null}
+      </View>
     </View>
   );
 }
 
 export default function BenchScreen() {
+  const [subTab, setSubTab] = React.useState<BenchTab>('controle');
+  const [rawCmd, setRawCmd] = React.useState('');
+  const [calFeedback, setCalFeedback] = React.useState<string | null>(null);
+
   const logs = useSumoStore((s) => s.logs);
+  const telemetry = useSumoStore((s) => s.telemetry);
+  const info = useSumoStore((s) => s.info);
+  const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
+
   const emergencyStop = useSumoStore((s) => s.emergencyStop);
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
@@ -63,8 +78,6 @@ export default function BenchScreen() {
   const clearLogs = useSumoStore((s) => s.clearLogs);
   const updateMeasurement = useSumoStore((s) => s.updateMeasurement);
   const exportMeasurementsMarkdown = useSumoStore((s) => s.exportMeasurementsMarkdown);
-
-  const [rawCmd, setRawCmd] = React.useState('');
 
   const handleSendRaw = () => {
     const clean = rawCmd.trim();
@@ -76,270 +89,631 @@ export default function BenchScreen() {
 
   const handleShareMeasurements = async () => {
     const report = exportMeasurementsMarkdown();
-    await Share.share({ message: report, title: 'Medições Sumo_Auto_ESP32' });
+    await Share.share({ message: report, title: 'Ficha Técnica Sumo_Auto_ESP32' });
   };
 
+  const bg = highContrast ? '#000000' : '#09090B';
+  const surface = highContrast ? '#111114' : '#121215';
+  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)';
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#090D16' }} edges={['top']}>
-      <ScrollView
-        style={{ flex: 1 }}
-        className="flex-1 px-4 pt-2"
-        contentContainerStyle={{ paddingBottom: 32 }}
-        contentContainerClassName="pb-8 gap-3.5"
-      >
-        <View>
-          <Text className="text-xl font-bold text-slate-50">Bancada & Medições</Text>
-          <Text className="text-xs text-slate-400">
-            Calibração, teste seguro de motores (rodas suspensas) e ficha técnica real
-          </Text>
+    <View style={[styles.screen, { backgroundColor: bg }]}>
+      {/* Top 3-Way Context Segmented Control */}
+      <View style={[styles.segWrap, { borderBottomColor: divider }]}>
+        <View style={[styles.segTrack, { backgroundColor: surface, borderColor: divider }]}>
+          {[
+            { id: 'controle' as const, label: 'Controle' },
+            { id: 'calibracao' as const, label: 'Calibração' },
+            { id: 'ficha' as const, label: 'Ficha Técnica' },
+          ].map((t) => {
+            const active = subTab === t.id;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => setSubTab(t.id)}
+                style={[styles.segBtn, active && styles.segBtnActive]}
+              >
+                <Text style={[styles.segBtnText, active && styles.segBtnTextActive]}>
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+      </View>
 
-        {/* Emergency + Calibration */}
-        <Pressable
-          onPress={() => {
-            Vibration.vibrate(120);
-            void emergencyStop();
-          }}
-          className="flex-row items-center justify-center gap-2 rounded-2xl bg-rose-600 py-4 active:opacity-80"
-        >
-          <OctagonAlert color="#FFF" size={20} />
-          <Text className="text-sm font-extrabold text-white">PARADA IMEDIATA (PARADA*)</Text>
-        </Pressable>
+      {/* SUB-TAB 1: CONTROLE (Split View: Live BLE Console on top + Thumb-Zone D-Pad on bottom) */}
+      {subTab === 'controle' ? (
+        <View style={styles.splitWrap}>
+          {/* Top Half: Live BLE NUS Console */}
+          <View style={[styles.consolePane, { backgroundColor: surface, borderColor: divider }]}>
+            <View style={[styles.consoleHeader, { borderBottomColor: divider }]}>
+              <Text style={styles.microLabel}>CONSOLE BLE NUS</Text>
+              <Pressable onPress={clearLogs} hitSlop={8}>
+                <Trash2 color="#71717A" size={14} />
+              </Pressable>
+            </View>
 
-        <View className="flex-row gap-2.5">
+            <ScrollView style={styles.logList} contentContainerStyle={styles.logListContent}>
+              {logs.slice(0, 20).map((item) => (
+                <Text
+                  key={item.id}
+                  style={[
+                    styles.logLine,
+                    {
+                      color:
+                        item.dir === 'tx'
+                          ? '#FF4D00'
+                          : item.dir === 'rx'
+                            ? '#22C55E'
+                            : '#A1A1AA',
+                    },
+                  ]}
+                >
+                  [{item.time}] {item.dir.toUpperCase()} {item.text}
+                </Text>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.cmdBar, { borderTopColor: divider }]}>
+              <TextInput
+                value={rawCmd}
+                onChangeText={setRawCmd}
+                placeholder="Comando (INFO*, EST,6*, dados*)"
+                placeholderTextColor="#52525B"
+                autoCapitalize="characters"
+                onSubmitEditing={handleSendRaw}
+                style={styles.cmdInput}
+              />
+              <Pressable onPress={handleSendRaw} style={styles.cmdSendBtn}>
+                <Send color="#FFFFFF" size={14} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Bottom Half: Ergonomic Thumb-Zone D-Pad */}
+          <View style={styles.dpadPane}>
+            <Text style={styles.safetyNote}>
+              Rodas suspensas · segure para acionar · soltar envia parada
+            </Text>
+
+            <View style={styles.dpadGrid}>
+              <View style={styles.dpadRow}>
+                <Pressable
+                  onPressIn={() => {
+                    Vibration.vibrate(20);
+                    void benchJog('FRENTE');
+                  }}
+                  onPressOut={() => void emergencyStop()}
+                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                >
+                  <ArrowUp color="#FAFAFA" size={26} />
+                </Pressable>
+              </View>
+
+              <View style={styles.dpadRow}>
+                <Pressable
+                  onPressIn={() => {
+                    Vibration.vibrate(20);
+                    void benchJog('ESQ');
+                  }}
+                  onPressOut={() => void emergencyStop()}
+                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                >
+                  <ArrowLeft color="#FAFAFA" size={26} />
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    Vibration.vibrate(90);
+                    void emergencyStop();
+                  }}
+                  style={styles.dpadStop}
+                >
+                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
+                </Pressable>
+
+                <Pressable
+                  onPressIn={() => {
+                    Vibration.vibrate(20);
+                    void benchJog('DIR');
+                  }}
+                  onPressOut={() => void emergencyStop()}
+                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                >
+                  <ArrowRight color="#FAFAFA" size={26} />
+                </Pressable>
+              </View>
+
+              <View style={styles.dpadRow}>
+                <Pressable
+                  onPressIn={() => {
+                    Vibration.vibrate(20);
+                    void benchJog('RE');
+                  }}
+                  onPressOut={() => void emergencyStop()}
+                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                >
+                  <ArrowDown color="#FAFAFA" size={26} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {/* SUB-TAB 2: CALIBRAÇÃO */}
+      {subTab === 'calibracao' ? (
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>ROTINAS DE CALIBRAÇÃO</Text>
+
           <Pressable
             onPress={() => {
-              Vibration.vibrate(40);
+              Vibration.vibrate(35);
+              setCalFeedback('Calibrando sensores de linha (pista preta) e offsets da IMU...');
               void calibrateAll();
             }}
-            className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#111827] py-3 active:opacity-75"
+            style={[styles.calAction, { backgroundColor: surface, borderColor: divider }]}
           >
-            <Target color="#38BDF8" size={16} />
-            <Text className="text-xs font-bold text-slate-100">Calibrar Linha+IMU</Text>
+            <Target color="#FF4D00" size={20} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.calTitle}>Calibrar Linha + IMU</Text>
+              <Text style={styles.calSub}>
+                Posicione o robô imóvel sobre a área preta do dohyō
+              </Text>
+            </View>
           </Pressable>
+
           <Pressable
             onPress={() => {
-              Vibration.vibrate(40);
+              Vibration.vibrate(35);
+              setCalFeedback('Recalibrando bias do acelerômetro e giroscópio (mantenha imóvel)...');
               void calibrateImu();
             }}
-            className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#111827] py-3 active:opacity-75"
+            style={[styles.calAction, { backgroundColor: surface, borderColor: divider }]}
           >
-            <Compass color="#34D399" size={16} />
-            <Text className="text-xs font-bold text-slate-100">Calibrar Só IMU</Text>
+            <Compass color="#FAFAFA" size={20} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.calTitle}>Calibrar Somente IMU</Text>
+              <Text style={styles.calSub}>
+                Zera drift do giroscópio (Z) e referencial de aceleração
+              </Text>
+            </View>
           </Pressable>
-        </View>
 
-        {/* Motor Bench D-Pad */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 items-center gap-3">
-          <View className="w-full">
-            <Text className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              Teste de Motores em Bancada (Pré-Partida)
-            </Text>
-            <Text className="text-[11px] text-amber-400">
-              Use somente com rodas suspensas. Soltar ou tocar no centro envia PARADA*.
-            </Text>
-          </View>
-
-          <View className="gap-2">
-            <View className="flex-row justify-center">
-              <Pressable
-                onPressIn={() => void benchJog('FRENTE')}
-                onPressOut={() => void emergencyStop()}
-                className="h-14 w-16 items-center justify-center rounded-xl bg-slate-800 active:bg-orange-600"
-              >
-                <ArrowUp color="#F8FAFC" size={24} />
-              </Pressable>
+          {calFeedback ? (
+            <View style={[styles.feedbackRow, { borderColor: 'rgba(255,77,0,0.35)' }]}>
+              <Text style={styles.feedbackText}>{calFeedback}</Text>
             </View>
-            <View className="flex-row items-center gap-2">
-              <Pressable
-                onPressIn={() => void benchJog('ESQ')}
-                onPressOut={() => void emergencyStop()}
-                className="h-14 w-16 items-center justify-center rounded-xl bg-slate-800 active:bg-orange-600"
-              >
-                <ArrowLeft color="#F8FAFC" size={24} />
-              </Pressable>
-              <Pressable
-                onPress={() => void emergencyStop()}
-                className="h-14 w-16 items-center justify-center rounded-xl bg-rose-600 active:opacity-80"
-              >
-                <Square color="#FFF" size={20} fill="#FFF" />
-              </Pressable>
-              <Pressable
-                onPressIn={() => void benchJog('DIR')}
-                onPressOut={() => void emergencyStop()}
-                className="h-14 w-16 items-center justify-center rounded-xl bg-slate-800 active:bg-orange-600"
-              >
-                <ArrowRight color="#F8FAFC" size={24} />
-              </Pressable>
-            </View>
-            <View className="flex-row justify-center">
-              <Pressable
-                onPressIn={() => void benchJog('RE')}
-                onPressOut={() => void emergencyStop()}
-                className="h-14 w-16 items-center justify-center rounded-xl bg-slate-800 active:bg-orange-600"
-              >
-                <ArrowDown color="#F8FAFC" size={24} />
-              </Pressable>
-            </View>
-          </View>
-        </View>
+          ) : null}
 
-        {/* Physical Measurements Checklist (Synced with README Unified Guide) */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 gap-3">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1">
-              <Text className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Guia Unificado de Medições (Salvo no Celular)
-              </Text>
-              <Text className="text-[10px] text-slate-400">
-                Anote na bancada/dohyō e exporte para calibrar firmware e simulador
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => void handleShareMeasurements()}
-              className="flex-row items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 active:opacity-80"
-            >
-              <Share2 color="#FFF" size={14} />
-              <Text className="text-xs font-bold text-white">Exportar</Text>
-            </Pressable>
-          </View>
-
-          <View className="flex-row flex-wrap gap-2.5">
-            <MeasureField
-              label="Massa (kg)"
-              value={measurements.massKg}
-              placeholder="0.50"
-              onChangeText={(v) => updateMeasurement('massKg', v)}
-            />
-            <MeasureField
-              label="Bitola rodas (cm)"
-              value={measurements.trackWidthCm}
-              placeholder="9.0"
-              onChangeText={(v) => updateMeasurement('trackWidthCm', v)}
-            />
-            <MeasureField
-              label="CI Ponte H"
-              value={measurements.hbridgeModel}
-              placeholder="TB6612 / DRV8833"
-              onChangeText={(v) => updateMeasurement('hbridgeModel', v)}
-            />
-            <MeasureField
-              label="Vbat Multímetro (V)"
-              value={measurements.vbatMultimeterV}
-              placeholder="8.20"
-              onChangeText={(v) => updateMeasurement('vbatMultimeterV', v)}
-            />
-            <MeasureField
-              label="Alcance IR Claro (cm)"
-              value={measurements.irRangeWhiteCm}
-              placeholder="45"
-              onChangeText={(v) => updateMeasurement('irRangeWhiteCm', v)}
-            />
-            <MeasureField
-              label="Alcance IR Stealth (cm)"
-              value={measurements.irRangeStealthCm}
-              placeholder="22"
-              onChangeText={(v) => updateMeasurement('irRangeStealthCm', v)}
-            />
-            <MeasureField
-              label="ADC Preto (LD / LE)"
-              value={`${measurements.adcBlackLd}`}
-              placeholder="2050"
-              onChangeText={(v) => updateMeasurement('adcBlackLd', v)}
-            />
-            <MeasureField
-              label="ADC Branco (LD / LE)"
-              value={`${measurements.adcWhiteLd}`}
-              placeholder="130"
-              onChangeText={(v) => updateMeasurement('adcWhiteLd', v)}
-            />
-            <MeasureField
-              label="Reta 50cm (s)"
-              value={measurements.sprint50cmSec}
-              placeholder="0.55"
-              onChangeText={(v) => updateMeasurement('sprint50cmSec', v)}
-            />
-            <MeasureField
-              label="Parada Borda (cm)"
-              value={measurements.edgeStopDistCm}
-              placeholder="3.5"
-              onChangeText={(v) => updateMeasurement('edgeStopDistCm', v)}
-            />
-            <MeasureField
-              label="Atrito Estático (N)"
-              value={measurements.muStaticForceN}
-              placeholder="8.0"
-              onChangeText={(v) => updateMeasurement('muStaticForceN', v)}
-            />
-            <MeasureField
-              label="Força Stall 255 (N)"
-              value={measurements.stallForceN}
-              placeholder="9.5"
-              onChangeText={(v) => updateMeasurement('stallForceN', v)}
-            />
-          </View>
-
-          <View className="flex-row items-center justify-between rounded-xl bg-slate-900 px-3 py-2">
-            <Text className="text-xs text-slate-300">Ponte H suporta Short-Brake?</Text>
-            <Switch
-              value={measurements.supportsShortBrake}
-              onValueChange={(v) => updateMeasurement('supportsShortBrake', v)}
-              trackColor={{ false: '#334155', true: '#16A34A' }}
-              thumbColor="#F8FAFC"
-            />
-          </View>
-        </View>
-
-        {/* BLE Raw Console */}
-        <View className="rounded-2xl border border-slate-800 bg-[#111827] p-4 gap-2.5">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Terminal color="#94A3B8" size={16} />
-              <Text className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Console BLE NUS
-              </Text>
-            </View>
-            <Pressable onPress={clearLogs} className="p-1 active:opacity-70">
-              <Trash2 color="#64748B" size={16} />
-            </Pressable>
-          </View>
-
-          <View className="flex-row gap-2">
-            <TextInput
-              value={rawCmd}
-              onChangeText={setRawCmd}
-              placeholder="Comando (ex: INFO* ou EST,6*)"
-              placeholderTextColor="#475569"
-              autoCapitalize="characters"
-              onSubmitEditing={handleSendRaw}
-              className="h-10 flex-1 rounded-xl border border-slate-700 bg-[#090D16] px-3 font-mono text-xs text-slate-100"
-            />
-            <Pressable
-              onPress={handleSendRaw}
-              className="h-10 w-12 items-center justify-center rounded-xl bg-orange-600 active:opacity-80"
-            >
-              <Send color="#FFF" size={16} />
-            </Pressable>
-          </View>
-
-          <View className="max-h-48 rounded-xl bg-[#060911] p-2.5 gap-1">
-            {logs.slice(0, 14).map((item) => (
-              <Text
-                key={item.id}
-                className={`font-mono text-[11px] ${
-                  item.dir === 'tx'
-                    ? 'text-orange-400'
-                    : item.dir === 'rx'
-                      ? 'text-emerald-400'
-                      : 'text-slate-400'
-                }`}
-              >
-                [{item.time}] {item.dir.toUpperCase()}: {item.text}
-              </Text>
+          <Text style={styles.sectionTitle}>LEITURA E LIMIARES ATUAIS</Text>
+          <View style={[styles.readoutTable, { borderTopColor: divider }]}>
+            {[
+              { k: 'Linha Esq (LE)', cur: `${telemetry.sensorLE}`, ref: `limiar ≤ ${info.linhaLimiarEsq}` },
+              { k: 'Linha Dir (LD)', cur: `${telemetry.sensorLD}`, ref: `limiar ≤ ${info.linhaLimiarDir}` },
+              { k: 'Aceleração (ax / ay)', cur: `${info.ax.toFixed(2)} / ${info.ay.toFixed(2)}`, ref: 'm/s²' },
+              { k: 'Giroscópio (gz / Yaw)', cur: `${info.gz.toFixed(1)} °/s`, ref: `hdg ${info.headingDeg.toFixed(1)}°` },
+            ].map((row) => (
+              <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
+                <Text style={styles.specLabel}>{row.k}</Text>
+                <View style={styles.readoutRight}>
+                  <Text style={styles.readoutVal}>{row.cur}</Text>
+                  <Text style={styles.readoutRef}>{row.ref}</Text>
+                </View>
+              </View>
             ))}
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      ) : null}
+
+      {/* SUB-TAB 3: FICHA TÉCNICA */}
+      {subTab === 'ficha' ? (
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.fichaHeader}>
+            <Text style={styles.sectionTitleInline}>CHASSI & DRIVER</Text>
+            <Pressable
+              onPress={() => void handleShareMeasurements()}
+              style={[styles.exportBtn, { borderColor: divider, backgroundColor: surface }]}
+            >
+              <Share2 color="#FAFAFA" size={13} />
+              <Text style={styles.exportText}>Exportar</Text>
+            </Pressable>
+          </View>
+
+          <View style={[styles.readoutTable, { borderTopColor: divider }]}>
+            <SpecRow
+              label="Massa total"
+              value={measurements.massKg}
+              unit="kg"
+              placeholder="0.50"
+              onChangeText={(v) => updateMeasurement('massKg', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Bitola entre rodas"
+              value={measurements.trackWidthCm}
+              unit="cm"
+              placeholder="9.0"
+              onChangeText={(v) => updateMeasurement('trackWidthCm', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="CI Ponte H"
+              value={measurements.hbridgeModel}
+              placeholder="TB6612FNG"
+              onChangeText={(v) => updateMeasurement('hbridgeModel', v)}
+              dividerColor={divider}
+            />
+            <View style={[styles.specRow, { borderBottomColor: divider }]}>
+              <Text style={styles.specLabel}>Suporta Short-Brake</Text>
+              <Switch
+                value={measurements.supportsShortBrake}
+                onValueChange={(v) => updateMeasurement('supportsShortBrake', v)}
+                trackColor={{ false: '#27272A', true: '#FF4D00' }}
+                thumbColor="#FAFAFA"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>SENSORES & BATERIA</Text>
+          <View style={[styles.readoutTable, { borderTopColor: divider }]}>
+            <SpecRow
+              label="Vbat (multímetro)"
+              value={measurements.vbatMultimeterV}
+              unit="V"
+              placeholder="8.20"
+              onChangeText={(v) => updateMeasurement('vbatMultimeterV', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Alcance IR (alvo claro)"
+              value={measurements.irRangeWhiteCm}
+              unit="cm"
+              placeholder="45"
+              onChangeText={(v) => updateMeasurement('irRangeWhiteCm', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Alcance IR (stealth preto)"
+              value={measurements.irRangeStealthCm}
+              unit="cm"
+              placeholder="22"
+              onChangeText={(v) => updateMeasurement('irRangeStealthCm', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="ADC Preto (LD)"
+              value={measurements.adcBlackLd}
+              placeholder="2050"
+              onChangeText={(v) => updateMeasurement('adcBlackLd', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="ADC Branco (LD)"
+              value={measurements.adcWhiteLd}
+              placeholder="130"
+              onChangeText={(v) => updateMeasurement('adcWhiteLd', v)}
+              dividerColor={divider}
+            />
+          </View>
+
+          <Text style={styles.sectionTitle}>DINÂMICA</Text>
+          <View style={[styles.readoutTable, { borderTopColor: divider }]}>
+            <SpecRow
+              label="Tempo reta 50 cm"
+              value={measurements.sprint50cmSec}
+              unit="s"
+              placeholder="0.55"
+              onChangeText={(v) => updateMeasurement('sprint50cmSec', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Distância parada borda"
+              value={measurements.edgeStopDistCm}
+              unit="cm"
+              placeholder="3.5"
+              onChangeText={(v) => updateMeasurement('edgeStopDistCm', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Atrito estático"
+              value={measurements.muStaticForceN}
+              unit="N"
+              placeholder="8.0"
+              onChangeText={(v) => updateMeasurement('muStaticForceN', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Força stall (PWM 255)"
+              value={measurements.stallForceN}
+              unit="N"
+              placeholder="9.5"
+              onChangeText={(v) => updateMeasurement('stallForceN', v)}
+              dividerColor={divider}
+            />
+          </View>
+        </ScrollView>
+      ) : null}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  flex1: {
+    flex: 1,
+  },
+  segWrap: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  segTrack: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 3,
+    gap: 3,
+  },
+  segBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    borderRadius: 6,
+  },
+  segBtnActive: {
+    backgroundColor: '#27272A',
+  },
+  segBtnText: {
+    color: '#71717A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  segBtnTextActive: {
+    color: '#FAFAFA',
+    fontWeight: '700',
+  },
+  splitWrap: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  consolePane: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    minHeight: 190,
+  },
+  consoleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  microLabel: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  logList: {
+    flex: 1,
+    backgroundColor: '#050507',
+  },
+  logListContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  logLine: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  cmdBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  cmdInput: {
+    flex: 1,
+    height: 36,
+    color: '#FAFAFA',
+    fontFamily: 'monospace',
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
+  },
+  cmdSendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#FF4D00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dpadPane: {
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 4,
+  },
+  safetyNote: {
+    color: '#71717A',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  dpadGrid: {
+    gap: 10,
+    alignItems: 'center',
+  },
+  dpadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dpadKey: {
+    width: 72,
+    height: 62,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dpadStop: {
+    width: 72,
+    height: 62,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 10,
+  },
+  sectionTitle: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    marginTop: 6,
+  },
+  sectionTitleInline: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+  },
+  calAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  calTitle: {
+    color: '#FAFAFA',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calSub: {
+    color: '#A1A1AA',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  feedbackRow: {
+    borderRadius: 6,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,77,0,0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  feedbackText: {
+    color: '#FAFAFA',
+    fontSize: 12,
+  },
+  readoutTable: {
+    borderTopWidth: 1,
+  },
+  readoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+  },
+  readoutRight: {
+    alignItems: 'flex-end',
+    gap: 1,
+  },
+  readoutVal: {
+    color: '#FAFAFA',
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
+  },
+  readoutRef: {
+    color: '#71717A',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  fichaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  exportText: {
+    color: '#FAFAFA',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  specRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+  },
+  specLabel: {
+    color: '#D4D4D8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  specInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  specInput: {
+    color: '#FAFAFA',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+    minWidth: 92,
+    height: 30,
+    paddingVertical: 0,
+    paddingHorizontal: 6,
+    textAlignVertical: 'center',
+    backgroundColor: '#121215',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  specUnit: {
+    color: '#71717A',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    width: 24,
+  },
+});
