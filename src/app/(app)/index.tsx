@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, RotateCcw } from 'lucide-react-native';
 import * as React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { RobotRadarSvg } from '@/components/sumo/RobotRadarSvg';
 import { STRATEGIES } from '@/lib/sumo/protocol';
@@ -14,19 +14,46 @@ const SHORT_MATCH_STATE: Record<number, string> = {
   3: 'STOP',
 };
 
+function fmtSigned(val: number, digits: number): string {
+  const fixed = val.toFixed(digits);
+  return val > 0.04 ? `+${fixed}` : fixed;
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
+  const [imuMode, setImuMode] = React.useState<'deg' | 'accel'>('deg');
+
   const telemetry = useSumoStore((s) => s.telemetry);
   const info = useSumoStore((s) => s.info);
   const highContrast = useSumoStore((s) => s.highContrast);
+  const hapticOnDetect = useSumoStore((s) => s.hapticOnDetect);
+  const setHapticOnDetect = useSumoStore((s) => s.setHapticOnDetect);
+  const zeroYaw = useSumoStore((s) => s.zeroYaw);
 
   const currentStrat = STRATEGIES.find((s) => s.id === info.estrategia) ?? STRATEGIES[0];
   const stateLabel = SHORT_MATCH_STATE[info.matchState] ?? 'IDLE';
   const isActiveCombat = info.matchState === 1 || info.matchState === 2;
+  const isTilted =
+    info.imuOnline && (Math.abs(info.pitchDeg) > 15 || Math.abs(info.rollDeg) > 15);
 
   const bg = highContrast ? '#000000' : '#09090B';
   const surface = highContrast ? '#111114' : '#121215';
   const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.09)';
+
+  const imuColumns =
+    imuMode === 'deg'
+      ? [
+          { k: 'PITCH', val: `${fmtSigned(info.pitchDeg, 1)}°`, unit: 'deg' },
+          { k: 'ROLL', val: `${fmtSigned(info.rollDeg, 1)}°`, unit: 'deg' },
+          { k: 'YAW', val: `${info.headingDeg.toFixed(1)}°`, unit: 'deg' },
+          { k: 'GIRO', val: info.gz.toFixed(1), unit: '°/s' },
+        ]
+      : [
+          { k: 'AX', val: info.ax.toFixed(2), unit: 'm/s²' },
+          { k: 'AY', val: info.ay.toFixed(2), unit: 'm/s²' },
+          { k: 'GZ', val: info.gz.toFixed(1), unit: '°/s' },
+          { k: 'YAW', val: `${info.headingDeg.toFixed(1)}°`, unit: 'deg' },
+        ];
 
   return (
     <ScrollView
@@ -35,7 +62,45 @@ export default function DashboardScreen() {
     >
       {/* Hero Schematic Radar + Front Line Sensors */}
       <View style={[styles.radarPanel, { backgroundColor: surface, borderColor: divider }]}>
-        <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
+        <View style={styles.radarTopRow}>
+          <View style={styles.radarTitleCluster}>
+            <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
+            {isTilted ? (
+              <View style={styles.tiltBadge}>
+                <Text style={styles.tiltBadgeText}>
+                  INCLINADO {fmtSigned(info.pitchDeg, 0)}°
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Pressable
+            onPress={() => {
+              const next = !hapticOnDetect;
+              setHapticOnDetect(next);
+              if (next) Vibration.vibrate(20);
+            }}
+            style={[
+              styles.hapticPill,
+              hapticOnDetect && styles.hapticPillActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.hapticDot,
+                { backgroundColor: hapticOnDetect ? '#FF4D00' : '#71717A' },
+              ]}
+            />
+            <Text
+              style={[
+                styles.hapticText,
+                hapticOnDetect && { color: '#FAFAFA' },
+              ]}
+            >
+              Vibrar IR
+            </Text>
+          </Pressable>
+        </View>
 
         <RobotRadarSvg
           senEsq={telemetry.sen_esq}
@@ -46,6 +111,7 @@ export default function DashboardScreen() {
           sensorLD={telemetry.sensorLD}
           thrLE={info.linhaLimiarEsq}
           thrLD={info.linhaLimiarDir}
+          headingDeg={info.headingDeg}
           highContrast={highContrast}
         />
       </View>
@@ -84,30 +150,54 @@ export default function DashboardScreen() {
         </View>
       </Pressable>
 
-      {/* Flat 4-Column IMU Table */}
+      {/* Flat 4-Column IMU Table with GRAUS / m/s² Toggle + Zero Yaw */}
       <View style={[styles.imuSection, { borderColor: divider }]}>
         <View style={styles.imuHeader}>
-          <Text style={styles.microLabel}>IMU · MPU6050</Text>
           <View style={styles.imuStatusWrap}>
+            <Text style={styles.microLabel}>IMU · MPU6050</Text>
             <View
               style={[
                 styles.imuDot,
                 { backgroundColor: info.imuOnline ? '#22C55E' : '#EF4444' },
               ]}
             />
-            <Text style={[styles.imuStatusText, { color: info.imuOnline ? '#D4D4D8' : '#EF4444' }]}>
-              {info.imuOnline ? 'ONLINE' : 'OFFLINE'}
-            </Text>
+          </View>
+
+          <View style={styles.imuControls}>
+            <View style={[styles.modeSwitch, { borderColor: divider }]}>
+              <Pressable
+                onPress={() => setImuMode('deg')}
+                style={[styles.modeBtn, imuMode === 'deg' && styles.modeBtnActive]}
+              >
+                <Text style={[styles.modeBtnText, imuMode === 'deg' && styles.modeBtnTextActive]}>
+                  GRAUS
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setImuMode('accel')}
+                style={[styles.modeBtn, imuMode === 'accel' && styles.modeBtnActive]}
+              >
+                <Text style={[styles.modeBtnText, imuMode === 'accel' && styles.modeBtnTextActive]}>
+                  m/s²
+                </Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={() => {
+                Vibration.vibrate(20);
+                void zeroYaw();
+              }}
+              style={[styles.zeroBtn, { borderColor: divider }]}
+            >
+              <RotateCcw color="#D4D4D8" size={11} />
+              <Text style={styles.zeroBtnText}>0° Yaw</Text>
+            </Pressable>
           </View>
         </View>
 
         <View style={[styles.imuTable, { borderTopColor: divider }]}>
-          {[
-            { k: 'AX', val: info.ax.toFixed(2), unit: 'm/s²' },
-            { k: 'AY', val: info.ay.toFixed(2), unit: 'm/s²' },
-            { k: 'GZ', val: info.gz.toFixed(1), unit: '°/s' },
-            { k: 'YAW', val: `${info.headingDeg.toFixed(1)}°`, unit: 'deg' },
-          ].map((col, idx) => (
+          {imuColumns.map((col, idx) => (
             <View
               key={col.k}
               style={[
@@ -152,7 +242,57 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 11,
+  },
+  radarTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  radarTitleCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tiltBadge: {
+    backgroundColor: 'rgba(245,158,11,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.5)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  tiltBadgeText: {
+    color: '#F59E0B',
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  hapticPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  hapticPillActive: {
+    borderColor: 'rgba(255,77,0,0.55)',
+    backgroundColor: 'rgba(255,77,0,0.12)',
+  },
+  hapticDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  hapticText: {
+    color: '#9A9AA6',
+    fontSize: 10,
+    fontWeight: '700',
   },
   microLabel: {
     color: '#9A9AA6',
@@ -217,7 +357,53 @@ const styles = StyleSheet.create({
   imuStatusWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
+  },
+  imuControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modeSwitch: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 5,
+    backgroundColor: '#121215',
+    padding: 2,
+    gap: 2,
+  },
+  modeBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 3,
+  },
+  modeBtnActive: {
+    backgroundColor: '#27272A',
+  },
+  modeBtnText: {
+    color: '#9A9AA6',
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  modeBtnTextActive: {
+    color: '#FAFAFA',
+  },
+  zeroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 5,
+    backgroundColor: '#161619',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  zeroBtnText: {
+    color: '#D4D4D8',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   imuDot: {
     width: 6,

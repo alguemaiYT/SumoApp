@@ -1,3 +1,4 @@
+import { Vibration } from 'react-native';
 import { create } from 'zustand';
 
 import { getItem, setItem } from '@/lib/storage';
@@ -6,6 +7,8 @@ import type { ConnectionPhase, DiscoveredRobot } from './ble-transport';
 import { SumoBleTransport } from './ble-transport';
 import type {
   BenchJogDirection,
+  BenchMotorDir,
+  BenchMotorSide,
   RobotInfoData,
   StrategyId,
   TelemetryData,
@@ -13,6 +16,7 @@ import type {
 } from './protocol';
 import {
   cmdBenchJog,
+  cmdBenchMotor,
   cmdCalibrateAll,
   cmdCalibrateImu,
   cmdEmergencyStop,
@@ -26,6 +30,7 @@ import {
   cmdStraightSpeed,
   cmdStrategy,
   cmdTurnSpeed,
+  cmdZeroYaw,
   DEFAULT_DEVICE_NAME,
   parseDadosLine,
   parseInfoLine,
@@ -113,6 +118,8 @@ const DEFAULT_INFO: RobotInfoData = {
   ay: 0,
   gz: 0,
   headingDeg: 0,
+  pitchDeg: 0,
+  rollDeg: 0,
   linhaLimiarDir: 250,
   linhaLimiarEsq: 250,
   irStartDelayMs: 0,
@@ -120,12 +127,24 @@ const DEFAULT_INFO: RobotInfoData = {
   timestamp: 0,
 };
 
+export interface SensorLatchCounts {
+  se: number;
+  sce: number;
+  scd: number;
+  sd: number;
+}
+
+const DEFAULT_SENSOR_LATCH: SensorLatchCounts = { se: 0, sce: 0, scd: 0, sd: 0 };
+
 interface SumoStore {
   phase: ConnectionPhase;
   statusDetail: string;
   isSimulation: boolean;
   autoConnect: boolean;
   highContrast: boolean;
+  hapticOnDetect: boolean;
+  activePulseMotor: string | null;
+  sensorLatch: SensorLatchCounts;
   lastDeviceId: string | null;
   connectedDevice: DiscoveredRobot | null;
   discoveredDevices: DiscoveredRobot[];
@@ -141,6 +160,8 @@ interface SumoStore {
   disconnect: () => Promise<void>;
   setAutoConnect: (enabled: boolean) => void;
   setHighContrast: (enabled: boolean) => void;
+  setHapticOnDetect: (enabled: boolean) => void;
+  resetSensorLatch: () => void;
   toggleSimulation: (enabled: boolean) => void;
 
   // Robot commands
@@ -158,18 +179,29 @@ interface SumoStore {
   emergencyStop: () => Promise<void>;
   calibrateAll: () => Promise<void>;
   calibrateImu: () => Promise<void>;
+  zeroYaw: () => Promise<void>;
   resetRobotConfig: () => Promise<void>;
   benchJog: (dir: BenchJogDirection) => Promise<void>;
+  benchMotorPulse: (side: BenchMotorSide, dir: BenchMotorDir, durationMs?: number) => Promise<void>;
   clearLogs: () => void;
 
   // Measurements persistence
   updateMeasurement: <K extends keyof MeasurementRecord>(key: K, value: MeasurementRecord[K]) => void;
+  captureTelemetryToMeasurements: (mode: 'black' | 'white' | 'vbat') => void;
   exportMeasurementsMarkdown: () => string;
 }
 
 let transport: SumoBleTransport | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let motorPulseTimer: ReturnType<typeof setTimeout> | null = null;
 let pollTick = 0;
+
+function clearMotorPulseTimer(): void {
+  if (motorPulseTimer) {
+    clearTimeout(motorPulseTimer);
+    motorPulseTimer = null;
+  }
+}
 
 function nowTimeStr(): string {
   const d = new Date();
@@ -202,7 +234,32 @@ export const useSumoStore = create<SumoStore>((set, get) => {
   const handleIncomingLine = (line: string) => {
     const dados = parseDadosLine(line);
     if (dados) {
-      set({ telemetry: dados });
+      const prev = get().telemetry;
+      const seRise = prev.sen_esq === 0 && dados.sen_esq === 1;
+      const sceRise = prev.sen_centro_esq === 0 && dados.sen_centro_esq === 1;
+      const scdRise = prev.sen_centro_dir === 0 && dados.sen_centro_dir === 1;
+      const sdRise = prev.sen_dir === 0 && dados.sen_dir === 1;
+      const anyRise = seRise || sceRise || scdRise || sdRise;
+
+      if (anyRise && get().hapticOnDetect) {
+        try {
+          Vibration?.vibrate?.(25);
+        } catch {
+          // ignore on non-native environments
+        }
+      }
+
+      set((s) => ({
+        telemetry: dados,
+        sensorLatch: anyRise
+          ? {
+              se: s.sensorLatch.se + (seRise ? 1 : 0),
+              sce: s.sensorLatch.sce + (sceRise ? 1 : 0),
+              scd: s.sensorLatch.scd + (scdRise ? 1 : 0),
+              sd: s.sensorLatch.sd + (sdRise ? 1 : 0),
+            }
+          : s.sensorLatch,
+      }));
       return;
     }
     const info = parseInfoLine(line);
@@ -227,19 +284,17 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         const activeCenter = pollTick % 6 < 3 ? 1 : 0;
         const raw = `${t.velocreta}|${t.velocgiro}|${t.HBEvasao ? 1 : 0}|${t.limiarParado}|${t.limiarEmpurrado}|${simVbat}|0|${activeCenter}|${activeCenter}|0|${1980 + (pollTick % 40)}|${2020 - (pollTick % 35)}`;
         handleIncomingLine(raw);
-        if (pollTick % 2 === 0) {
-          const inf = state.info;
-          handleIncomingLine(
-            `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|gz=0.3|hdg=${((pollTick * 3) % 360).toFixed(1)}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper`,
-          );
-        }
+        const inf = state.info;
+        const simPitch = Number((Math.sin(pollTick / 6) * 2.4).toFixed(1));
+        const simRoll = Number((Math.cos(pollTick / 7) * 1.1).toFixed(1));
+        handleIncomingLine(
+          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|gz=0.3|hdg=${((pollTick * 3) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper`,
+        );
         return;
       }
       void transport?.sendCommand(cmdRequestTelemetry());
-      if (pollTick % 2 === 0) {
-        void transport?.sendCommand(cmdRequestInfo());
-      }
-    }, 450);
+      void transport?.sendCommand(cmdRequestInfo());
+    }, 320);
   };
 
   const sendCmd = async (cmd: string) => {
@@ -267,6 +322,11 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       } else if (key === 'CAL') {
         set((s) => ({ info: { ...s.info, linhaLimiarDir: 580, linhaLimiarEsq: 590 } }));
         appendLog('rx', 'SIM: Calibração de linha + IMU concluída');
+      } else if (key === 'IMU_CAL' || key === 'ZERO_YAW') {
+        set((s) => ({ info: { ...s.info, headingDeg: 0, gz: 0 } }));
+        appendLog('rx', key === 'ZERO_YAW' ? 'SIM: Yaw zerado (0.0°)' : 'SIM: IMU calibrada');
+      } else if (key === 'MOT_E' || key === 'MOT_D') {
+        appendLog('rx', `SIM: Motor ${key === 'MOT_E' ? 'Esquerdo' : 'Direito'} dir=${val ?? '0'}`);
       } else if (key === 'RESET_CFG') {
         set({ telemetry: { ...DEFAULT_TELEMETRY, Vbat: 8.05 }, info: { ...DEFAULT_INFO, imuOnline: true, firmwareBranch: 'exper' } });
       }
@@ -294,6 +354,9 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     isSimulation: false,
     autoConnect: savedAuto ?? true,
     highContrast: savedHighContrast ?? false,
+    hapticOnDetect: false,
+    activePulseMotor: null,
+    sensorLatch: DEFAULT_SENSOR_LATCH,
     lastDeviceId: savedLastId,
     connectedDevice: null,
     discoveredDevices: [],
@@ -399,6 +462,14 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       set({ highContrast: enabled });
     },
 
+    setHapticOnDetect: (enabled) => {
+      set({ hapticOnDetect: enabled });
+    },
+
+    resetSensorLatch: () => {
+      set({ sensorLatch: DEFAULT_SENSOR_LATCH });
+    },
+
     toggleSimulation: (enabled) => {
       stopPolling();
       if (enabled) {
@@ -455,6 +526,8 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     },
 
     emergencyStop: async () => {
+      clearMotorPulseTimer();
+      set({ activePulseMotor: null });
       await sendCmd(cmdEmergencyStop());
       await sendCmd(cmdRequestInfo());
     },
@@ -467,13 +540,31 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       await sendCmd(cmdCalibrateImu());
     },
 
+    zeroYaw: async () => {
+      await sendCmd(cmdZeroYaw());
+    },
+
     resetRobotConfig: async () => {
       await sendCmd(cmdResetConfig());
       await sendCmd(cmdRequestTelemetry());
     },
 
     benchJog: async (dir) => {
+      clearMotorPulseTimer();
+      set({ activePulseMotor: null });
       await sendCmd(cmdBenchJog(dir));
+    },
+
+    benchMotorPulse: async (side, dir, durationMs = 1000) => {
+      clearMotorPulseTimer();
+      const tag = `${side}:${dir}`;
+      set({ activePulseMotor: tag });
+      await sendCmd(cmdBenchMotor(side, dir));
+      motorPulseTimer = setTimeout(() => {
+        motorPulseTimer = null;
+        set({ activePulseMotor: null });
+        void sendCmd(cmdEmergencyStop());
+      }, durationMs);
     },
 
     clearLogs: () => set({ logs: [] }),
@@ -481,6 +572,24 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     updateMeasurement: (key, value) => {
       set((s) => {
         const next = { ...s.measurements, [key]: value };
+        void setItem(STORAGE_KEYS.measurements, next);
+        return { measurements: next };
+      });
+    },
+
+    captureTelemetryToMeasurements: (mode) => {
+      const t = get().telemetry;
+      set((s) => {
+        const next = { ...s.measurements };
+        if (mode === 'black') {
+          next.adcBlackLd = String(t.sensorLD);
+          next.adcBlackLe = String(t.sensorLE);
+        } else if (mode === 'white') {
+          next.adcWhiteLd = String(t.sensorLD);
+          next.adcWhiteLe = String(t.sensorLE);
+        } else if (mode === 'vbat') {
+          next.vbatTelemetryV = t.Vbat.toFixed(2);
+        }
         void setItem(STORAGE_KEYS.measurements, next);
         return { measurements: next };
       });

@@ -24,11 +24,17 @@ import {
   View,
 } from 'react-native';
 
+import { lipo2sStatus } from '@/lib/sumo/protocol';
 import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
 export type BenchTab = 'controle' | 'calibracao' | 'ficha';
 
-const QUICK_CMDS = ['INFO*', 'dados*', 'CAL*', 'PARADA*'] as const;
+const QUICK_CMDS = ['INFO*', 'dados*', 'ZERO_YAW*', 'CAL*', 'PARADA*'] as const;
+
+function fmtSigned(val: number, digits: number): string {
+  const fixed = val.toFixed(digits);
+  return val > 0.04 ? `+${fixed}` : fixed;
+}
 
 function logLineColor(entry: ConsoleEntry): string {
   const lower = entry.text.toLowerCase();
@@ -89,15 +95,22 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const info = useSumoStore((s) => s.info);
   const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
+  const sensorLatch = useSumoStore((s) => s.sensorLatch);
+  const activePulseMotor = useSumoStore((s) => s.activePulseMotor);
 
   const emergencyStop = useSumoStore((s) => s.emergencyStop);
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
   const benchJog = useSumoStore((s) => s.benchJog);
+  const benchMotorPulse = useSumoStore((s) => s.benchMotorPulse);
   const sendRaw = useSumoStore((s) => s.sendRaw);
   const clearLogs = useSumoStore((s) => s.clearLogs);
+  const resetSensorLatch = useSumoStore((s) => s.resetSensorLatch);
   const updateMeasurement = useSumoStore((s) => s.updateMeasurement);
+  const captureTelemetryToMeasurements = useSumoStore((s) => s.captureTelemetryToMeasurements);
   const exportMeasurementsMarkdown = useSumoStore((s) => s.exportMeasurementsMarkdown);
+
+  const bat = lipo2sStatus(telemetry.Vbat);
 
   // Chronological terminal order: oldest on top, newest anchored at bottom next to input
   const chronologicalLogs = React.useMemo(() => [...logs.slice(0, 30)].reverse(), [logs]);
@@ -285,6 +298,45 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
                   </Pressable>
                 </View>
               </View>
+
+              {/* Isolated Single-Motor Safe 1s Pulse Strip */}
+              <View style={styles.motorPulseStrip}>
+                <Text style={styles.motorPulseLabel}>PULSO 1S</Text>
+                {(
+                  [
+                    { side: 'E' as const, dir: 1 as const, label: 'Esq +' },
+                    { side: 'E' as const, dir: -1 as const, label: 'Esq -' },
+                    { side: 'D' as const, dir: 1 as const, label: 'Dir +' },
+                    { side: 'D' as const, dir: -1 as const, label: 'Dir -' },
+                  ] as const
+                ).map((btn) => {
+                  const tag = `${btn.side}:${btn.dir}`;
+                  const active = activePulseMotor === tag;
+                  return (
+                    <Pressable
+                      key={tag}
+                      onPress={() => {
+                        Vibration.vibrate(25);
+                        void benchMotorPulse(btn.side, btn.dir, 1000);
+                      }}
+                      style={[
+                        styles.motorPulseBtn,
+                        { backgroundColor: surface, borderColor: divider },
+                        active && styles.motorPulseBtnActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.motorPulseBtnText,
+                          active && { color: '#FAFAFA' },
+                        ]}
+                      >
+                        {btn.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           ) : null}
         </View>
@@ -335,19 +387,93 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
             </View>
           ) : null}
 
+          <View style={styles.fichaHeader}>
+            <Text style={styles.sectionTitleInline}>DIAGNÓSTICO DE PINOS IR (LATCH)</Text>
+            <Pressable
+              onPress={resetSensorLatch}
+              style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
+            >
+              <Text style={styles.miniBtnText}>Limpar</Text>
+            </Pressable>
+          </View>
+          <View style={[styles.pinDiagGrid, { borderColor: divider, backgroundColor: surface }]}>
+            {(
+              [
+                { name: 'SE', gpio: '32', val: telemetry.sen_esq, count: sensorLatch.se },
+                { name: 'SCE', gpio: '33', val: telemetry.sen_centro_esq, count: sensorLatch.sce },
+                { name: 'SCD', gpio: '25', val: telemetry.sen_centro_dir, count: sensorLatch.scd },
+                { name: 'SD', gpio: '26', val: telemetry.sen_dir, count: sensorLatch.sd },
+              ] as const
+            ).map((pin, idx) => {
+              const on = pin.val === 1;
+              return (
+                <View
+                  key={pin.name}
+                  style={[
+                    styles.pinDiagCell,
+                    idx > 0 && { borderLeftWidth: 1, borderLeftColor: divider },
+                  ]}
+                >
+                  <Text style={styles.pinDiagLabel}>
+                    {pin.name}·{pin.gpio}
+                  </Text>
+                  <Text style={[styles.pinDiagVal, on && { color: '#FF4D00' }]}>
+                    {pin.val}
+                  </Text>
+                  <Text style={styles.pinDiagLatch}>×{pin.count}</Text>
+                </View>
+              );
+            })}
+          </View>
+
           <Text style={styles.sectionTitle}>LEITURA E LIMIARES ATUAIS</Text>
           <View style={[styles.readoutTable, { borderTopColor: divider }]}>
             {[
-              { k: 'Linha Esq (LE)', cur: `${telemetry.sensorLE}`, ref: `limiar ≤ ${info.linhaLimiarEsq}` },
-              { k: 'Linha Dir (LD)', cur: `${telemetry.sensorLD}`, ref: `limiar ≤ ${info.linhaLimiarDir}` },
-              { k: 'Aceleração (ax / ay)', cur: `${info.ax.toFixed(2)} / ${info.ay.toFixed(2)}`, ref: 'm/s²' },
-              { k: 'Giroscópio (gz / Yaw)', cur: `${info.gz.toFixed(1)} °/s`, ref: `hdg ${info.headingDeg.toFixed(1)}°` },
+              {
+                k: 'Bateria LiPo 2S',
+                cur: telemetry.Vbat > 0 ? `${telemetry.Vbat.toFixed(2)} V` : '--.-- V',
+                ref:
+                  bat.level === 'none'
+                    ? 'aguardando telemetria'
+                    : bat.level === 'usb'
+                      ? 'alimentação USB'
+                      : `${bat.cellV.toFixed(2)} V/cél · ${bat.pct}%${bat.level !== 'ok' ? ' · RECARREGAR' : ''}`,
+                warn: bat.level === 'low' || bat.level === 'critical',
+              },
+              {
+                k: 'Inclinação (Pitch / Roll)',
+                cur: `${fmtSigned(info.pitchDeg, 1)}° / ${fmtSigned(info.rollDeg, 1)}°`,
+                ref: 'gravidade absoluta',
+                warn: false,
+              },
+              {
+                k: 'Yaw / Giroscópio',
+                cur: `${info.headingDeg.toFixed(1)}°`,
+                ref: `gz ${info.gz.toFixed(1)} °/s`,
+                warn: false,
+              },
+              {
+                k: 'Linha Esq (LE · 35)',
+                cur: `${telemetry.sensorLE}`,
+                ref: `limiar ≤ ${info.linhaLimiarEsq}`,
+                warn: false,
+              },
+              {
+                k: 'Linha Dir (LD · 27)',
+                cur: `${telemetry.sensorLD}`,
+                ref: `limiar ≤ ${info.linhaLimiarDir}`,
+                warn: false,
+              },
             ].map((row) => (
               <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
                 <Text style={styles.specLabel}>{row.k}</Text>
                 <View style={styles.readoutRight}>
-                  <Text style={styles.readoutVal}>{row.cur}</Text>
-                  <Text style={styles.readoutRef}>{row.ref}</Text>
+                  <Text style={[styles.readoutVal, row.warn && { color: '#F59E0B' }]}>
+                    {row.cur}
+                  </Text>
+                  <Text style={[styles.readoutRef, row.warn && { color: '#F59E0B' }]}>
+                    {row.ref}
+                  </Text>
                 </View>
               </View>
             ))}
@@ -404,7 +530,38 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>SENSORES & BATERIA</Text>
+          <View style={styles.fichaHeader}>
+            <Text style={styles.sectionTitleInline}>SENSORES & BATERIA</Text>
+            <View style={styles.captureRow}>
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(15);
+                  captureTelemetryToMeasurements('vbat');
+                }}
+                style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
+              >
+                <Text style={styles.miniBtnText}>+ Vbat</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(15);
+                  captureTelemetryToMeasurements('black');
+                }}
+                style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
+              >
+                <Text style={styles.miniBtnText}>+ Preto</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(15);
+                  captureTelemetryToMeasurements('white');
+                }}
+                style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
+              >
+                <Text style={styles.miniBtnText}>+ Branco</Text>
+              </Pressable>
+            </View>
+          </View>
           <View style={[styles.readoutTable, { borderTopColor: divider }]}>
             <SpecRow
               label="Vbat (multímetro)"
@@ -412,6 +569,14 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
               unit="V"
               placeholder="8.20"
               onChangeText={(v) => updateMeasurement('vbatMultimeterV', v)}
+              dividerColor={divider}
+            />
+            <SpecRow
+              label="Vbat (telemetria BLE)"
+              value={measurements.vbatTelemetryV}
+              unit="V"
+              placeholder="8.05"
+              onChangeText={(v) => updateMeasurement('vbatTelemetryV', v)}
               dividerColor={divider}
             />
             <SpecRow
@@ -575,8 +740,9 @@ const styles = StyleSheet.create({
   },
   quickChipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderTopWidth: 1,
@@ -587,7 +753,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 5,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 4,
   },
   quickChipText: {
@@ -595,6 +761,80 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 10,
     fontWeight: '700',
+  },
+  motorPulseStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  motorPulseLabel: {
+    color: '#9A9AA6',
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 0.6,
+  },
+  motorPulseBtn: {
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  motorPulseBtnActive: {
+    borderColor: '#FF4D00',
+    backgroundColor: 'rgba(255,77,0,0.2)',
+  },
+  motorPulseBtnText: {
+    color: '#D4D4D8',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  pinDiagGrid: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 8,
+  },
+  pinDiagCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  pinDiagLabel: {
+    color: '#9A9AA6',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  pinDiagVal: {
+    color: '#FAFAFA',
+    fontSize: 18,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  pinDiagLatch: {
+    color: '#9A9AA6',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  captureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  miniBtn: {
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  miniBtnText: {
+    color: '#D4D4D8',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   cmdBar: {
     flexDirection: 'row',

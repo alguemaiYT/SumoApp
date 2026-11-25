@@ -167,6 +167,8 @@ export interface RobotInfoData {
   ay: number;
   gz: number;
   headingDeg: number;
+  pitchDeg: number;
+  rollDeg: number;
   linhaLimiarDir: number;
   linhaLimiarEsq: number;
   irStartDelayMs: number;
@@ -175,6 +177,37 @@ export interface RobotInfoData {
 }
 
 export type BenchJogDirection = 'FRENTE' | 'RE' | 'ESQ' | 'DIR';
+export type BenchMotorSide = 'E' | 'D';
+export type BenchMotorDir = -1 | 0 | 1;
+
+export interface Lipo2sHealth {
+  cellV: number;
+  pct: number;
+  level: 'none' | 'usb' | 'critical' | 'low' | 'ok';
+}
+
+export function lipo2sStatus(vbat: number): Lipo2sHealth {
+  if (!Number.isFinite(vbat) || vbat <= 0.1) {
+    return { cellV: 0, pct: 0, level: 'none' };
+  }
+  const cellV = Number((vbat / 2).toFixed(2));
+  if (vbat < 5.2) {
+    return { cellV, pct: 0, level: 'usb' };
+  }
+  // Realistic 2S LiPo discharge curve (6.60V=0%, 7.00V=15%, 7.40V=45%, 7.80V=75%, 8.40V=100%)
+  let pct = 0;
+  if (vbat <= 6.6) pct = 0;
+  else if (vbat < 7.0) pct = ((vbat - 6.6) / 0.4) * 15;
+  else if (vbat < 7.4) pct = 15 + ((vbat - 7.0) / 0.4) * 30;
+  else if (vbat < 7.8) pct = 45 + ((vbat - 7.4) / 0.4) * 30;
+  else if (vbat < 8.4) pct = 75 + ((vbat - 7.8) / 0.6) * 25;
+  else pct = 100;
+
+  const level: Lipo2sHealth['level'] =
+    vbat < 7.1 ? 'critical' : vbat < 7.4 ? 'low' : 'ok';
+
+  return { cellV, pct: Math.round(pct), level };
+}
 
 export function clampInt(val: number, min: number, max: number): number {
   if (!Number.isFinite(val)) return min;
@@ -196,8 +229,11 @@ export const cmdRequestTelemetry = (): string => 'dados*';
 export const cmdRequestInfo = (): string => 'INFO*';
 export const cmdCalibrateAll = (): string => 'CAL*';
 export const cmdCalibrateImu = (): string => 'IMU_CAL*';
+export const cmdZeroYaw = (): string => 'ZERO_YAW*';
 export const cmdResetConfig = (): string => 'RESET_CFG*';
 export const cmdBenchJog = (dir: BenchJogDirection): string => `${dir}*`;
+export const cmdBenchMotor = (side: BenchMotorSide, dir: BenchMotorDir): string =>
+  `MOT_${side},${dir}*`;
 
 export function parseDadosLine(raw: string, now = Date.now()): TelemetryData | null {
   const trimmed = raw.trim();
@@ -275,14 +311,30 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
   const firmwareBranch: RobotInfoData['firmwareBranch'] =
     fwRaw === 'debug' || fwRaw === 'exper' ? fwRaw : 'unknown';
 
+  const ax = Number.parseFloat(map.ax ?? '0') || 0;
+  const ay = Number.parseFloat(map.ay ?? '0') || 0;
+  const gz = Number.parseFloat(map.gz ?? '0') || 0;
+  const headingDeg = Number.parseFloat(map.hdg ?? '0') || 0;
+
+  const rawPitch = map.pitch !== undefined ? Number.parseFloat(map.pitch) : Number.NaN;
+  const rawRoll = map.roll !== undefined ? Number.parseFloat(map.roll) : Number.NaN;
+  const pitchDeg = Number.isFinite(rawPitch)
+    ? rawPitch
+    : Number(((Math.asin(Math.max(-1, Math.min(1, ax / 9.81))) * 180) / Math.PI).toFixed(1));
+  const rollDeg = Number.isFinite(rawRoll)
+    ? rawRoll
+    : Number(((Math.asin(Math.max(-1, Math.min(1, ay / 9.81))) * 180) / Math.PI).toFixed(1));
+
   return {
     estrategia: est as StrategyId,
     matchState: state as MatchStateCode,
     imuOnline: map.imu === '1',
-    ax: Number.parseFloat(map.ax ?? '0') || 0,
-    ay: Number.parseFloat(map.ay ?? '0') || 0,
-    gz: Number.parseFloat(map.gz ?? '0') || 0,
-    headingDeg: Number.parseFloat(map.hdg ?? '0') || 0,
+    ax,
+    ay,
+    gz,
+    headingDeg,
+    pitchDeg,
+    rollDeg,
     linhaLimiarDir: Number.parseInt(map.ldThr ?? '250', 10) || 250,
     linhaLimiarEsq: Number.parseInt(map.leThr ?? '250', 10) || 250,
     irStartDelayMs: Number.parseInt(map.ird ?? '0', 10) || 0,

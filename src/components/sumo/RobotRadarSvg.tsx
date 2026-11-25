@@ -11,6 +11,7 @@ interface RobotRadarProps {
   sensorLD: number;
   thrLE: number;
   thrLD: number;
+  headingDeg?: number;
   highContrast?: boolean;
 }
 
@@ -23,6 +24,7 @@ export function RobotRadarSvg({
   sensorLD,
   thrLE,
   thrLD,
+  headingDeg = 0,
   highContrast = false,
 }: RobotRadarProps) {
   const seOn = senEsq === 1;
@@ -32,6 +34,12 @@ export function RobotRadarSvg({
 
   const leEdge = sensorLE <= thrLE;
   const ldEdge = sensorLD <= thrLD;
+
+  // Heading needle inside chassis (+headingDeg = CCW/left, -headingDeg = CW/right)
+  const hdgRad = (-headingDeg * Math.PI) / 180;
+  const needleLen = 20;
+  const needleTipX = Number((156 + Math.sin(hdgRad) * needleLen).toFixed(1));
+  const needleTipY = Number((161 - Math.cos(hdgRad) * needleLen).toFixed(1));
 
   const activeStroke = '#FF4D00';
   const idleStroke = highContrast ? '#52525B' : '#32323A';
@@ -154,10 +162,21 @@ export function RobotRadarSvg({
             strokeWidth={1.5}
           />
 
-          {/* Center Orientation Crosshair */}
-          <Line x1={156} y1={140} x2={156} y2={182} stroke="rgba(255,255,255,0.09)" strokeWidth={1} />
-          <Line x1={134} y1={161} x2={178} y2={161} stroke="rgba(255,255,255,0.09)" strokeWidth={1} />
-          <Path d="M 151 146 L 156 138 L 161 146" fill="none" stroke="#8E8E98" strokeWidth={1.5} />
+          {/* Center Orientation Crosshair + Live Yaw Heading Needle */}
+          <Circle cx={156} cy={161} r={22} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+          <Line x1={156} y1={140} x2={156} y2={182} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+          <Line x1={134} y1={161} x2={178} y2={161} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+          <Line
+            x1={156}
+            y1={161}
+            x2={needleTipX}
+            y2={needleTipY}
+            stroke="#FF4D00"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+          <Circle cx={needleTipX} cy={needleTipY} r={2.8} fill="#FF4D00" />
+          <Circle cx={156} cy={161} r={2.2} fill="#FAFAFA" />
 
           {/* Front-Left Line Sensor (LE) — glows high-contrast white/red halo on white line */}
           {leEdge ? (

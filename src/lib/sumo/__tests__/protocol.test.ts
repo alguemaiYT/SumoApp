@@ -3,6 +3,7 @@ import {
   BLE_NUS_SERVICE_UUID,
   BLE_NUS_TX_UUID,
   cmdBenchJog,
+  cmdBenchMotor,
   cmdCalibrateAll,
   cmdCalibrateImu,
   cmdEmergencyStop,
@@ -16,7 +17,9 @@ import {
   cmdStraightSpeed,
   cmdStrategy,
   cmdTurnSpeed,
+  cmdZeroYaw,
   LineAccumulator,
+  lipo2sStatus,
   parseDadosLine,
   parseInfoLine,
   STRATEGIES,
@@ -54,9 +57,13 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdRequestInfo()).toBe('INFO*');
     expect(cmdCalibrateAll()).toBe('CAL*');
     expect(cmdCalibrateImu()).toBe('IMU_CAL*');
+    expect(cmdZeroYaw()).toBe('ZERO_YAW*');
     expect(cmdResetConfig()).toBe('RESET_CFG*');
     expect(cmdBenchJog('FRENTE')).toBe('FRENTE*');
     expect(cmdBenchJog('ESQ')).toBe('ESQ*');
+    expect(cmdBenchMotor('E', 1)).toBe('MOT_E,1*');
+    expect(cmdBenchMotor('D', -1)).toBe('MOT_D,-1*');
+    expect(cmdBenchMotor('D', 0)).toBe('MOT_D,0*');
   });
 
   test('defines all 7 strategies aligned with firmware EST,1..7*', () => {
@@ -88,9 +95,9 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(parseDadosLine('')).toBeNull();
   });
 
-  test('parses extended INFO* telemetry line accurately', () => {
+  test('parses extended INFO* telemetry line with pitch/roll and legacy fallback', () => {
     const info = parseInfoLine(
-      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|gz=12.4|hdg=91.5|ldThr=410|leThr=420|ird=5000|fw=exper',
+      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|gz=12.4|hdg=91.5|pitch=35.4|roll=-2.1|ldThr=410|leThr=420|ird=5000|fw=exper',
       2000,
     );
     expect(info).toEqual({
@@ -101,12 +108,31 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
       ay: -0.05,
       gz: 12.4,
       headingDeg: 91.5,
+      pitchDeg: 35.4,
+      rollDeg: -2.1,
       linhaLimiarDir: 410,
       linhaLimiarEsq: 420,
       irStartDelayMs: 5000,
       firmwareBranch: 'exper',
       timestamp: 2000,
     });
+
+    // Legacy firmware without pitch/roll estimates from ax/ay
+    const legacy = parseInfoLine(
+      'INFO|est=1|state=0|imu=1|ax=4.905|ay=0.00|gz=0.0|hdg=0.0|ldThr=250|leThr=250|ird=0|fw=debug',
+      2100,
+    );
+    expect(legacy?.pitchDeg).toBe(30);
+    expect(legacy?.rollDeg).toBe(0);
+  });
+
+  test('computes realistic 2S LiPo health percentage and alert levels', () => {
+    expect(lipo2sStatus(0)).toEqual({ cellV: 0, pct: 0, level: 'none' });
+    expect(lipo2sStatus(4.9).level).toBe('usb');
+    expect(lipo2sStatus(8.4)).toEqual({ cellV: 4.2, pct: 100, level: 'ok' });
+    expect(lipo2sStatus(7.8)).toEqual({ cellV: 3.9, pct: 75, level: 'ok' });
+    expect(lipo2sStatus(7.2)).toEqual({ cellV: 3.6, pct: 30, level: 'low' });
+    expect(lipo2sStatus(6.9).level).toBe('critical');
   });
 
   test('LineAccumulator reassembles fragmented BLE notifications', () => {

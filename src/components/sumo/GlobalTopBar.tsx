@@ -12,6 +12,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, Vibration, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ConnectionPhase } from '@/lib/sumo/ble-transport';
+import { lipo2sStatus } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
 
 function statusMeta(phase: ConnectionPhase): { dot: string; label: string } {
@@ -59,8 +60,26 @@ export function GlobalTopBar() {
 
   const meta = statusMeta(phase);
   const isConnected = phase === 'connected';
-  const vbatPct = vbat > 0 ? Math.max(0, Math.min(100, ((vbat - 6.4) / (8.4 - 6.4)) * 100)) : 0;
-  const vbatBarColor = vbat === 0 ? '#3F3F46' : vbat >= 7.5 ? '#22C55E' : vbat >= 7.1 ? '#FF4D00' : '#EF4444';
+  const bat = lipo2sStatus(vbat);
+  const vbatPct = bat.level === 'usb' ? 100 : bat.pct;
+  const vbatBarColor =
+    bat.level === 'none'
+      ? '#3F3F46'
+      : bat.level === 'usb'
+        ? '#38BDF8'
+        : bat.level === 'ok'
+          ? '#22C55E'
+          : bat.level === 'low'
+            ? '#F59E0B'
+            : '#EF4444';
+  const vbatTextColor =
+    bat.level === 'none'
+      ? '#8E8E98'
+      : bat.level === 'critical'
+        ? '#EF4444'
+        : bat.level === 'low'
+          ? '#F59E0B'
+          : '#FAFAFA';
   const deviceLabel = connectedDevice?.name ?? (isSimulation ? 'Simulador' : 'Madinboo_BT');
 
   const bgBar = highContrast ? '#000000' : '#09090B';
@@ -100,7 +119,7 @@ export function GlobalTopBar() {
         {/* Right: Vbat + generous breathing room before STOP */}
         <View style={styles.rightCluster}>
           <View style={styles.vbatBox}>
-            <Text style={[styles.vbatText, { color: vbat > 0 ? '#FAFAFA' : '#8E8E98' }]}>
+            <Text style={[styles.vbatText, { color: vbatTextColor }]}>
               {vbat > 0 ? `${vbat.toFixed(1)}V` : '--.-V'}
             </Text>
             <View style={styles.vbatTrack}>
@@ -169,6 +188,11 @@ export function GlobalTopBar() {
                 </View>
                 <Text style={styles.sheetDetail} numberOfLines={2}>
                   {statusDetail || meta.label}
+                  {bat.level !== 'none'
+                    ? bat.level === 'usb'
+                      ? ` · USB (${vbat.toFixed(2)}V)`
+                      : ` · 2S ${bat.cellV.toFixed(2)}V/cél (${bat.pct}%)`
+                    : ''}
                 </Text>
               </View>
               {isConnected ? (
