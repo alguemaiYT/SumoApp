@@ -22,7 +22,7 @@ export default function TabLayout() {
             headerShown: false,
             sceneStyle: { backgroundColor: bg },
             tabBarActiveTintColor: '#FF4D00',
-            tabBarInactiveTintColor: '#71717A',
+            tabBarInactiveTintColor: '#8E8E98',
             tabBarStyle: {
               backgroundColor: bg,
               borderTopColor: highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)',

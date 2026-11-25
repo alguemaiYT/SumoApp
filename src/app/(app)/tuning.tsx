@@ -2,6 +2,7 @@ import { RotateCcw, Save } from 'lucide-react-native';
 import * as React from 'react';
 import {
   Alert,
+  type GestureResponderEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,7 @@ function ParamRow({
   min,
   max,
   decimals = 0,
+  fillFromRight = false,
   dividerColor,
 }: {
   label: string;
@@ -38,16 +40,33 @@ function ParamRow({
   min: number;
   max: number;
   decimals?: number;
+  fillFromRight?: boolean;
   dividerColor: string;
 }) {
-  const clamp = (n: number) => {
+  const [trackWidth, setTrackWidth] = React.useState(200);
+
+  const clampAndSnap = (n: number) => {
+    const snapped = Math.round(n / step) * step;
+    const c = Math.max(min, Math.min(max, snapped));
+    return decimals > 0 ? Number(c.toFixed(decimals)) : Math.round(c);
+  };
+
+  const clampExact = (n: number) => {
     const c = Math.max(min, Math.min(max, n));
     return decimals > 0 ? Number(c.toFixed(decimals)) : Math.round(c);
+  };
+
+  const handleTrackPress = (e: GestureResponderEvent) => {
+    if (trackWidth <= 0) return;
+    const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackWidth));
+    const raw = min + ratio * (max - min);
+    onChange(clampAndSnap(raw));
   };
 
   const dirty = Math.abs(value - savedValue) > (decimals > 0 ? 0.001 : 0);
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   const stepLabel = decimals > 0 ? `±${step.toFixed(decimals)}` : `±${step}`;
+  const accentCol = dirty ? '#FF4D00' : '#FAFAFA';
 
   return (
     <View style={[styles.paramRow, { borderBottomColor: dividerColor }]}>
@@ -59,36 +78,73 @@ function ParamRow({
         </View>
 
         <View style={styles.valueInputWrap}>
-          <TextInput
-            value={decimals > 0 ? value.toFixed(decimals) : String(value)}
-            keyboardType="numbers-and-punctuation"
-            onChangeText={(txt) => {
-              const parsed = Number.parseFloat(txt.replace(',', '.'));
-              if (Number.isFinite(parsed)) onChange(clamp(parsed));
-            }}
-            style={[styles.valueInput, dirty && { color: '#FF4D00' }]}
-          />
+          <View
+            style={[
+              styles.inputPill,
+              dirty && { borderColor: 'rgba(255,77,0,0.55)' },
+            ]}
+          >
+            <TextInput
+              value={decimals > 0 ? value.toFixed(decimals) : String(value)}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(txt) => {
+                const parsed = Number.parseFloat(txt.replace(',', '.'));
+                if (Number.isFinite(parsed)) onChange(clampExact(parsed));
+              }}
+              style={[styles.valueInput, dirty && { color: '#FF4D00' }]}
+            />
+          </View>
           <Text style={styles.valueUnit}>{unit}</Text>
         </View>
       </View>
 
       <View style={styles.controlRow}>
         <Pressable
-          onPress={() => onChange(clamp(value - step))}
+          onPress={() => onChange(clampExact(value - step))}
           style={styles.stepBtn}
         >
           <Text style={styles.stepBtnText}>−</Text>
         </Pressable>
 
         <View style={styles.barWrap}>
-          <View style={styles.barTrack}>
+          <Pressable
+            onPress={handleTrackPress}
+            onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+            style={styles.sliderHit}
+          >
+            <View style={styles.barTrack}>
+              {fillFromRight ? (
+                <View
+                  style={[
+                    styles.barFillRight,
+                    {
+                      left: `${pct}%`,
+                      right: 0,
+                      backgroundColor: accentCol,
+                    },
+                  ]}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.barFill,
+                    { width: `${pct}%`, backgroundColor: accentCol },
+                  ]}
+                />
+              )}
+            </View>
+            {/* Geometric Mixer Thumb (4x16px) */}
             <View
               style={[
-                styles.barFill,
-                { width: `${pct}%`, backgroundColor: dirty ? '#FF4D00' : '#FAFAFA' },
+                styles.thumb,
+                {
+                  left: `${pct}%`,
+                  backgroundColor: accentCol,
+                },
               ]}
             />
-          </View>
+          </Pressable>
+
           <View style={styles.barTicks}>
             <Text style={styles.tickText}>{decimals > 0 ? min.toFixed(decimals) : min}</Text>
             <Text style={styles.tickStep}>{stepLabel}</Text>
@@ -97,7 +153,7 @@ function ParamRow({
         </View>
 
         <Pressable
-          onPress={() => onChange(clamp(value + step))}
+          onPress={() => onChange(clampExact(value + step))}
           style={styles.stepBtn}
         >
           <Text style={styles.stepBtnText}>+</Text>
@@ -169,12 +225,12 @@ export default function TuningScreen() {
 
   const confirmReset = () => {
     Alert.alert(
-      'Restaurar padrões de fábrica',
-      'Isso sobrescreve as velocidades, limiares IMU e calibração na EEPROM do robô. Continuar?',
+      'Resetar EEPROM de fábrica',
+      'Isso sobrescreve as velocidades, limiares IMU e calibração na memória do robô. Continuar?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Restaurar',
+          text: 'Resetar',
           style: 'destructive',
           onPress: () => {
             Vibration.vibrate(60);
@@ -187,21 +243,21 @@ export default function TuningScreen() {
 
   const bg = highContrast ? '#000000' : '#09090B';
   const surface = highContrast ? '#111114' : '#121215';
-  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)';
+  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.09)';
 
   return (
     <View style={[styles.screen, { backgroundColor: bg }]}>
       <ScrollView style={styles.flex1} contentContainerStyle={styles.container}>
-        {/* Header + Subtle Factory Reset Action */}
+        {/* Header + Unambiguous Resetar Action */}
         <View style={styles.headerRow}>
           <Text style={styles.title}>Ajustes</Text>
           <Pressable onPress={confirmReset} style={styles.resetLink}>
-            <RotateCcw color="#71717A" size={13} />
-            <Text style={styles.resetText}>Padrões</Text>
+            <RotateCcw color="#9A9AA6" size={13} />
+            <Text style={styles.resetText}>Resetar</Text>
           </Pressable>
         </View>
 
-        {/* Compact 2x2 Preset Chips (fills draft so user sees dirty diff before saving) */}
+        {/* Compact 2x2 Preset Chips */}
         <View style={styles.presetGrid}>
           {TOURNAMENT_PRESETS.map((preset) => {
             const matches =
@@ -306,12 +362,13 @@ export default function TuningScreen() {
             min={-3.0}
             max={-0.05}
             decimals={2}
+            fillFromRight
             dividerColor={divider}
           />
         </View>
       </ScrollView>
 
-      {/* Contextual Dirty-State Save Bar pinned above tab bar */}
+      {/* Contextual Dirty-State Save Bar */}
       <View
         style={[
           styles.saveBar,
@@ -367,7 +424,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 20,
-    gap: 12,
+    gap: 11,
   },
   headerRow: {
     flexDirection: 'row',
@@ -388,7 +445,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   resetText: {
-    color: '#71717A',
+    color: '#B4B4BE',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -411,36 +468,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   presetMeta: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
   },
   sectionTitle: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.1,
-    marginTop: 4,
+    marginTop: 2,
     marginBottom: -4,
   },
   groupBlock: {
     borderTopWidth: 1,
   },
   paramRow: {
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    gap: 10,
+    gap: 9,
   },
   paramTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   paramLabelWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
   },
   dirtyDot: {
     width: 6,
@@ -454,35 +513,45 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   paramCode: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     fontFamily: 'monospace',
   },
   valueInputWrap: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 5,
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  inputPill: {
+    backgroundColor: '#161619',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    height: 30,
+    justifyContent: 'center',
   },
   valueInput: {
     color: '#FAFAFA',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
     textAlign: 'right',
-    minWidth: 56,
+    minWidth: 50,
     height: 28,
     paddingVertical: 0,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
     textAlignVertical: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.14)',
   },
   valueUnit: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontFamily: 'monospace',
+    width: 34,
+    textAlign: 'left',
   },
   controlRow: {
     flexDirection: 'row',
@@ -493,9 +562,9 @@ const styles = StyleSheet.create({
     width: 34,
     height: 30,
     borderRadius: 6,
-    backgroundColor: '#18181B',
+    backgroundColor: '#161619',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -507,16 +576,36 @@ const styles = StyleSheet.create({
   },
   barWrap: {
     flex: 1,
-    gap: 4,
+    gap: 2,
+  },
+  sliderHit: {
+    height: 18,
+    justifyContent: 'center',
+    position: 'relative',
   },
   barTrack: {
     height: 4,
     borderRadius: 2,
     backgroundColor: '#27272A',
     overflow: 'hidden',
+    position: 'relative',
   },
   barFill: {
     height: '100%',
+    borderRadius: 2,
+  },
+  barFillRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  thumb: {
+    position: 'absolute',
+    top: 1,
+    width: 4,
+    height: 16,
+    marginLeft: -2,
     borderRadius: 2,
   },
   barTicks: {
@@ -524,12 +613,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tickText: {
-    color: '#52525B',
+    color: '#8E8E98',
     fontSize: 10,
     fontFamily: 'monospace',
   },
   tickStep: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontFamily: 'monospace',
   },
@@ -537,11 +626,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderBottomWidth: 1,
   },
   switchSub: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     marginTop: 2,
   },
@@ -558,10 +647,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   discardText: {
-    color: '#A1A1AA',
+    color: '#D4D4D8',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -586,7 +675,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   syncedText: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontWeight: '600',
   },

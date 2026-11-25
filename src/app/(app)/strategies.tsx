@@ -1,8 +1,8 @@
-import { HelpCircle, Info, X } from 'lucide-react-native';
+import { Check, HelpCircle, X } from 'lucide-react-native';
 import * as React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 
-import { cmdIrStartDelay, STRATEGIES, type StrategyDefinition, type StrategyId } from '@/lib/sumo/protocol';
+import { cmdIrStartDelay, STRATEGIES, type StrategyId } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
 
 const SHORT_SUMMARY: Record<StrategyId, string> = {
@@ -17,17 +17,57 @@ const SHORT_SUMMARY: Record<StrategyId, string> = {
 
 export default function StrategiesScreen() {
   const info = useSumoStore((s) => s.info);
+  const phase = useSumoStore((s) => s.phase);
   const highContrast = useSumoStore((s) => s.highContrast);
   const setStrategy = useSumoStore((s) => s.setStrategy);
   const sendRaw = useSumoStore((s) => s.sendRaw);
 
   const [rulesModalOpen, setRulesModalOpen] = React.useState(false);
-  const [detailStrat, setDetailStrat] = React.useState<StrategyDefinition | null>(null);
+  const [eepromPulse, setEepromPulse] = React.useState(false);
+  const prevStratRef = React.useRef(info.estrategia);
+  const prevIrRef = React.useRef(info.irStartDelayMs);
 
-  const selectIrRule = async (ms: number) => {
-    Vibration.vibrate(25);
-    await sendRaw(cmdIrStartDelay(ms));
-    await sendRaw('INFO*');
+  React.useEffect(() => {
+    if (
+      prevStratRef.current !== info.estrategia ||
+      prevIrRef.current !== info.irStartDelayMs
+    ) {
+      prevStratRef.current = info.estrategia;
+      prevIrRef.current = info.irStartDelayMs;
+      setEepromPulse(true);
+      const t = setTimeout(() => setEepromPulse(false), 1800);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [info.estrategia, info.irStartDelayMs]);
+
+  const handleSelectStrategy = (id: StrategyId) => {
+    if (id === info.estrategia) return;
+    Vibration.vibrate(35);
+    void setStrategy(id);
+    if (phase === 'connected') {
+      setEepromPulse(true);
+      setTimeout(() => setEepromPulse(false), 1600);
+    }
+  };
+
+  const confirmIrRule = (ms: number) => {
+    if (ms === info.irStartDelayMs) return;
+    const label = ms === 0 ? '0s · Módulo Juiz (imediato)' : '+5s · Contagem Interna';
+    Alert.alert(
+      'Alterar regra de partida IR',
+      `Gravar "${label}" na EEPROM do robô?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: () => {
+            Vibration.vibrate(35);
+            void sendRaw(cmdIrStartDelay(ms)).then(() => sendRaw('INFO*'));
+          },
+        },
+      ],
+    );
   };
 
   const bg = highContrast ? '#000000' : '#09090B';
@@ -41,19 +81,27 @@ export default function StrategiesScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: bg }]}>
       <ScrollView style={styles.flex1} contentContainerStyle={styles.container}>
-        {/* Slim Header + ? Rules Button */}
+        {/* Slim Header + EEPROM Confirmation Badge + ? Rule Modal */}
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Estratégias</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>Estratégias</Text>
+            {eepromPulse ? (
+              <View style={styles.eepromBadge}>
+                <Check color="#22C55E" size={11} />
+                <Text style={styles.eepromBadgeText}>EEPROM OK</Text>
+              </View>
+            ) : null}
+          </View>
           <Pressable
             onPress={() => setRulesModalOpen(true)}
             style={[styles.helpBtn, { borderColor: border, backgroundColor: surface }]}
           >
-            <HelpCircle color="#A1A1AA" size={14} />
+            <HelpCircle color="#B4B4BE" size={14} />
             <Text style={styles.helpText}>Regra IR</Text>
           </Pressable>
         </View>
 
-        {/* Single-line IR Start Delay Segmented Control */}
+        {/* Single-line IR Start Delay Segmented Control (confirmation-guarded) */}
         <View style={[styles.irBar, { backgroundColor: surface, borderColor: border }]}>
           <Text style={styles.irBarLabel}>INÍCIO IR</Text>
           <View style={styles.segmented}>
@@ -65,11 +113,8 @@ export default function StrategiesScreen() {
               return (
                 <Pressable
                   key={opt.ms}
-                  onPress={() => void selectIrRule(opt.ms)}
-                  style={[
-                    styles.segItem,
-                    active && styles.segItemActive,
-                  ]}
+                  onPress={() => confirmIrRule(opt.ms)}
+                  style={[styles.segItem, active && styles.segItemActive]}
                 >
                   <Text style={[styles.segText, active && styles.segTextActive]}>
                     {opt.label}
@@ -80,22 +125,18 @@ export default function StrategiesScreen() {
           </View>
         </View>
 
-        {/* Dense 2x3 Strategy Grid (Strategies 01..06) */}
+        {/* Dense 2x3 Combat Strategy Grid (01..06, ZERO redundant info icons) */}
         <View style={styles.grid}>
           {mainGrid.map((st) => {
             const selected = info.estrategia === st.id;
             return (
               <Pressable
                 key={st.id}
-                onPress={() => {
-                  Vibration.vibrate(35);
-                  void setStrategy(st.id);
-                }}
-                onLongPress={() => setDetailStrat(st)}
+                onPress={() => handleSelectStrategy(st.id)}
                 style={[
                   styles.tile,
                   {
-                    backgroundColor: selected ? 'rgba(255, 77, 0, 0.10)' : surface,
+                    backgroundColor: selected ? 'rgba(255, 77, 0, 0.11)' : surface,
                     borderColor: selected ? '#FF4D00' : border,
                   },
                 ]}
@@ -104,13 +145,11 @@ export default function StrategiesScreen() {
                   <Text style={[styles.tileIndex, selected && { color: '#FF4D00' }]}>
                     0{st.id}
                   </Text>
-                  <Pressable
-                    onPress={() => setDetailStrat(st)}
-                    hitSlop={8}
-                    style={styles.infoIconBtn}
-                  >
-                    <Info color={selected ? '#FF4D00' : '#52525B'} size={14} />
-                  </Pressable>
+                  {selected ? (
+                    <View style={styles.activePill}>
+                      <Text style={styles.activePillText}>ATIVO</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <Text style={styles.tileName}>{st.name}</Text>
@@ -125,19 +164,16 @@ export default function StrategiesScreen() {
           })}
         </View>
 
-        {/* Compact Full-Width Row for Strategy 07 (Line Test) */}
+        {/* Visually Separated Test / Calibration Strategy 07 */}
+        <Text style={styles.sectionMicro}>TESTE / CALIBRAÇÃO</Text>
         {lineStrategy ? (
           <Pressable
-            onPress={() => {
-              Vibration.vibrate(35);
-              void setStrategy(lineStrategy.id);
-            }}
-            onLongPress={() => setDetailStrat(lineStrategy)}
+            onPress={() => handleSelectStrategy(lineStrategy.id)}
             style={[
               styles.rowTile,
               {
                 backgroundColor:
-                  info.estrategia === lineStrategy.id ? 'rgba(255, 77, 0, 0.10)' : surface,
+                  info.estrategia === lineStrategy.id ? 'rgba(255, 77, 0, 0.11)' : surface,
                 borderColor: info.estrategia === lineStrategy.id ? '#FF4D00' : border,
               },
             ]}
@@ -156,19 +192,28 @@ export default function StrategiesScreen() {
                 <Text style={styles.tileSummary}>{SHORT_SUMMARY[7]}</Text>
               </View>
             </View>
-            <View style={styles.rowTileRight}>
+            {info.estrategia === lineStrategy.id ? (
+              <View style={styles.activePill}>
+                <Text style={styles.activePillText}>ATIVO</Text>
+              </View>
+            ) : (
               <Text style={styles.tileTag}>{lineStrategy.shortTag}</Text>
-              <Pressable onPress={() => setDetailStrat(lineStrategy)} hitSlop={8}>
-                <Info color="#52525B" size={14} />
-              </Pressable>
-            </View>
+            )}
           </Pressable>
         ) : null}
 
-        {/* Active Strategy Quick Tactical Note */}
-        <View style={[styles.activeHint, { borderTopColor: border }]}>
-          <Text style={styles.hintLabel}>IDEAL CONTRA ({activeStrat.name.toUpperCase()})</Text>
-          <Text style={styles.hintText}>{activeStrat.bestAgainst}</Text>
+        {/* Anchored Tactical Detail Footer with Left Accent Bar */}
+        <View style={[styles.tacticalFooter, { backgroundColor: surface, borderColor: border }]}>
+          <View style={styles.tacticalAccent} />
+          <View style={styles.tacticalBody}>
+            <Text style={styles.hintLabel}>
+              0{activeStrat.id} {activeStrat.name.toUpperCase()} · IDEAL CONTRA
+            </Text>
+            <Text style={styles.hintPrimary}>{activeStrat.bestAgainst}</Text>
+            <Text style={styles.hintDesc} numberOfLines={2}>
+              {activeStrat.description}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -208,34 +253,6 @@ export default function StrategiesScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Strategy Detail Modal */}
-      <Modal
-        visible={detailStrat !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDetailStrat(null)}
-      >
-        <View style={styles.modalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDetailStrat(null)} />
-          {detailStrat ? (
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  0{detailStrat.id} · {detailStrat.name}
-                </Text>
-                <Pressable onPress={() => setDetailStrat(null)}>
-                  <X color="#A1A1AA" size={18} />
-                </Pressable>
-              </View>
-              <Text style={styles.modalBody}>{detailStrat.description}</Text>
-              <View style={styles.hairline} />
-              <Text style={styles.hintLabel}>IDEAL CONTRA</Text>
-              <Text style={styles.modalBody}>{detailStrat.bestAgainst}</Text>
-            </View>
-          ) : null}
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -250,7 +267,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 14,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 18,
     gap: 10,
   },
   headerRow: {
@@ -258,11 +275,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
     color: '#FAFAFA',
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  eepromBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(34,197,94,0.14)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  eepromBadgeText: {
+    color: '#22C55E',
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
   },
   helpBtn: {
     flexDirection: 'row',
@@ -274,7 +312,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   helpText: {
-    color: '#A1A1AA',
+    color: '#D4D4D8',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -290,7 +328,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   irBarLabel: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
@@ -311,7 +349,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF4D00',
   },
   segText: {
-    color: '#A1A1AA',
+    color: '#B4B4BE',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -327,23 +365,33 @@ const styles = StyleSheet.create({
     width: '48.6%',
     borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     gap: 3,
   },
   tileTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   tileIndex: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontWeight: '700',
     fontFamily: 'monospace',
   },
-  infoIconBtn: {
-    padding: 2,
+  activePill: {
+    backgroundColor: 'rgba(255,77,0,0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activePillText: {
+    color: '#FF4D00',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   tileName: {
     color: '#FAFAFA',
@@ -351,17 +399,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tileTag: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   tileSummary: {
-    color: '#A1A1AA',
+    color: '#B4B4BE',
     fontSize: 11,
     lineHeight: 15,
+    marginTop: 1,
+  },
+  sectionMicro: {
+    color: '#9A9AA6',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
     marginTop: 2,
+    marginBottom: -4,
   },
   rowTile: {
     flexDirection: 'row',
@@ -370,32 +426,45 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingVertical: 10,
   },
   rowTileLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  rowTileRight: {
+  tacticalFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 2,
   },
-  activeHint: {
-    borderTopWidth: 1,
-    paddingTop: 10,
-    gap: 2,
+  tacticalAccent: {
+    width: 3,
+    backgroundColor: '#FF4D00',
+  },
+  tacticalBody: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
   },
   hintLabel: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
-  hintText: {
-    color: '#D4D4D8',
+  hintPrimary: {
+    color: '#FAFAFA',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  hintDesc: {
+    color: '#B4B4BE',
+    fontSize: 11,
+    lineHeight: 16,
   },
   modalBackdrop: {
     flex: 1,
@@ -446,9 +515,5 @@ const styles = StyleSheet.create({
     color: '#E4E4E7',
     fontSize: 12,
     flex: 1,
-  },
-  hairline: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
 });

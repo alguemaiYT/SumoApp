@@ -26,7 +26,7 @@ export default function DashboardScreen() {
 
   const bg = highContrast ? '#000000' : '#09090B';
   const surface = highContrast ? '#111114' : '#121215';
-  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)';
+  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.09)';
 
   return (
     <ScrollView
@@ -35,12 +35,7 @@ export default function DashboardScreen() {
     >
       {/* Hero Schematic Radar + Front Line Sensors */}
       <View style={[styles.radarPanel, { backgroundColor: surface, borderColor: divider }]}>
-        <View style={styles.radarHeader}>
-          <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
-          <Text style={styles.microValue}>
-            {info.firmwareBranch !== 'unknown' ? info.firmwareBranch.toUpperCase() : 'BLE NUS'}
-          </Text>
-        </View>
+        <Text style={styles.microLabel}>RADAR DE SENSORES</Text>
 
         <RobotRadarSvg
           senEsq={telemetry.sen_esq}
@@ -85,7 +80,7 @@ export default function DashboardScreen() {
           <Text style={styles.stratSummary}>
             #{currentStrat.id} {currentStrat.name} · IR {info.irStartDelayMs / 1000}s
           </Text>
-          <ChevronRight color="#71717A" size={16} />
+          <ChevronRight color="#9A9AA6" size={16} />
         </View>
       </Pressable>
 
@@ -100,7 +95,7 @@ export default function DashboardScreen() {
                 { backgroundColor: info.imuOnline ? '#22C55E' : '#EF4444' },
               ]}
             />
-            <Text style={[styles.imuStatusText, { color: info.imuOnline ? '#A1A1AA' : '#EF4444' }]}>
+            <Text style={[styles.imuStatusText, { color: info.imuOnline ? '#D4D4D8' : '#EF4444' }]}>
               {info.imuOnline ? 'ONLINE' : 'OFFLINE'}
             </Text>
           </View>
@@ -111,7 +106,7 @@ export default function DashboardScreen() {
             { k: 'AX', val: info.ax.toFixed(2), unit: 'm/s²' },
             { k: 'AY', val: info.ay.toFixed(2), unit: 'm/s²' },
             { k: 'GZ', val: info.gz.toFixed(1), unit: '°/s' },
-            { k: 'YAW', val: info.headingDeg.toFixed(1), unit: '°' },
+            { k: 'YAW', val: `${info.headingDeg.toFixed(1)}°`, unit: 'deg' },
           ].map((col, idx) => (
             <View
               key={col.k}
@@ -159,23 +154,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
   },
-  radarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   microLabel: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
-  },
-  microValue: {
-    color: '#A1A1AA',
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    letterSpacing: 0.6,
   },
   stripRow: {
     flexDirection: 'row',
@@ -202,11 +185,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   metaSep: {
-    color: '#52525B',
+    color: '#71717A',
     fontSize: 12,
   },
   metaMono: {
-    color: '#A1A1AA',
+    color: '#B4B4BE',
     fontSize: 11,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
@@ -258,20 +241,20 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   imuKey: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   imuVal: {
     color: '#FAFAFA',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
   },
   imuUnit: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontFamily: 'monospace',
   },
@@ -282,12 +265,12 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   footerText: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontWeight: '600',
   },
   footerMono: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 interface RobotRadarProps {
   senEsq: number;
@@ -34,74 +34,110 @@ export function RobotRadarSvg({
   const ldEdge = sensorLD <= thrLD;
 
   const activeStroke = '#FF4D00';
-  const idleStroke = highContrast ? '#3F3F46' : '#27272A';
-  const activeFill = 'rgba(255, 77, 0, 0.22)';
-  const idleFill = 'rgba(255, 255, 255, 0.02)';
-  const chassisStroke = highContrast ? '#71717A' : '#3F3F46';
+  const idleStroke = highContrast ? '#52525B' : '#32323A';
+  const activeFill = 'rgba(255, 77, 0, 0.24)';
+  const idleFill = 'rgba(255, 255, 255, 0.025)';
+  const chassisStroke = highContrast ? '#A1A1AA' : '#52525B';
+  const idleLabel = highContrast ? '#D4D4D8' : '#9A9AA6';
 
   return (
     <View style={styles.wrap}>
-      {/* Top Sensor Labels aligned above arcs */}
-      <View style={styles.topLabels}>
-        <Text style={[styles.arcLabel, seOn && styles.arcLabelActive]}>SE</Text>
-        <Text style={[styles.arcLabel, sceOn && styles.arcLabelActive]}>SCE</Text>
-        <Text style={[styles.arcLabel, scdOn && styles.arcLabelActive]}>SCD</Text>
-        <Text style={[styles.arcLabel, sdOn && styles.arcLabelActive]}>SD</Text>
-      </View>
-
-      {/* Top-down Geometric Robot Schematic */}
+      {/* Top-down Geometric Robot Schematic with Radially Anchored Sector Labels */}
       <View style={styles.svgContainer}>
-        <Svg width={296} height={224} viewBox="0 0 296 224">
+        <Svg width={312} height={240} viewBox="0 0 312 240">
           {/* Subtle range guide ring */}
           <Path
-            d="M 42 132 A 106 106 0 0 1 254 132"
+            d="M 50 148 A 106 106 0 0 1 262 148"
             fill="none"
-            stroke="rgba(255,255,255,0.06)"
+            stroke="rgba(255,255,255,0.07)"
             strokeWidth={1}
             strokeDasharray="3,5"
           />
 
           {/* SE — Far Left IR Sector */}
           <Path
-            d="M 28 134 A 120 120 0 0 1 70 42 L 96 76 A 78 78 0 0 0 70 134 Z"
+            d="M 36 150 A 120 120 0 0 1 78 58 L 104 92 A 78 78 0 0 0 78 150 Z"
             fill={seOn ? activeFill : idleFill}
             stroke={seOn ? activeStroke : idleStroke}
-            strokeWidth={seOn ? 2 : 1.2}
+            strokeWidth={seOn ? 2.2 : 1.2}
           />
+          <SvgText
+            x={28}
+            y={94}
+            fill={seOn ? '#FF4D00' : idleLabel}
+            fontSize={11}
+            fontWeight="700"
+            fontFamily="monospace"
+            textAnchor="end"
+          >
+            SE
+          </SvgText>
 
           {/* SCE — Front-Left IR Sector */}
           <Path
-            d="M 76 37 A 120 120 0 0 1 145 14 L 145 58 A 78 78 0 0 0 101 72 Z"
+            d="M 84 53 A 120 120 0 0 1 153 30 L 153 74 A 78 78 0 0 0 109 88 Z"
             fill={sceOn ? activeFill : idleFill}
             stroke={sceOn ? activeStroke : idleStroke}
-            strokeWidth={sceOn ? 2 : 1.2}
+            strokeWidth={sceOn ? 2.2 : 1.2}
           />
+          <SvgText
+            x={114}
+            y={22}
+            fill={sceOn ? '#FF4D00' : idleLabel}
+            fontSize={11}
+            fontWeight="700"
+            fontFamily="monospace"
+            textAnchor="middle"
+          >
+            SCE
+          </SvgText>
 
           {/* SCD — Front-Right IR Sector */}
           <Path
-            d="M 151 14 A 120 120 0 0 1 220 37 L 195 72 A 78 78 0 0 0 151 58 Z"
+            d="M 159 30 A 120 120 0 0 1 228 53 L 203 88 A 78 78 0 0 0 159 74 Z"
             fill={scdOn ? activeFill : idleFill}
             stroke={scdOn ? activeStroke : idleStroke}
-            strokeWidth={scdOn ? 2 : 1.2}
+            strokeWidth={scdOn ? 2.2 : 1.2}
           />
+          <SvgText
+            x={198}
+            y={22}
+            fill={scdOn ? '#FF4D00' : idleLabel}
+            fontSize={11}
+            fontWeight="700"
+            fontFamily="monospace"
+            textAnchor="middle"
+          >
+            SCD
+          </SvgText>
 
           {/* SD — Far Right IR Sector */}
           <Path
-            d="M 226 42 A 120 120 0 0 1 268 134 L 226 134 A 78 78 0 0 0 200 76 Z"
+            d="M 234 58 A 120 120 0 0 1 276 150 L 234 150 A 78 78 0 0 0 208 92 Z"
             fill={sdOn ? activeFill : idleFill}
             stroke={sdOn ? activeStroke : idleStroke}
-            strokeWidth={sdOn ? 2 : 1.2}
+            strokeWidth={sdOn ? 2.2 : 1.2}
           />
-
-          {/* Robot Chassis (top-down sumo square with front wedge blade) */}
-          {/* Left & Right Wheels */}
-          <Rect x={88} y={136} width={10} height={44} rx={2} fill="#27272A" stroke="#52525B" strokeWidth={1} />
-          <Rect x={198} y={136} width={10} height={44} rx={2} fill="#27272A" stroke="#52525B" strokeWidth={1} />
-
-          {/* Main Body */}
-          <Rect
-            x={98}
+          <SvgText
+            x={284}
             y={94}
+            fill={sdOn ? '#FF4D00' : idleLabel}
+            fontSize={11}
+            fontWeight="700"
+            fontFamily="monospace"
+            textAnchor="start"
+          >
+            SD
+          </SvgText>
+
+          {/* Left & Right Wheels */}
+          <Rect x={96} y={152} width={10} height={44} rx={2} fill="#27272A" stroke="#52525B" strokeWidth={1} />
+          <Rect x={206} y={152} width={10} height={44} rx={2} fill="#27272A" stroke="#52525B" strokeWidth={1} />
+
+          {/* Main Chassis Body */}
+          <Rect
+            x={106}
+            y={110}
             width={100}
             height={102}
             rx={6}
@@ -110,52 +146,60 @@ export function RobotRadarSvg({
             strokeWidth={1.5}
           />
 
-          {/* Front Wedge / Blade Highlight */}
+          {/* Front Wedge / Blade */}
           <Path
-            d="M 98 112 L 106 86 L 190 86 L 198 112 Z"
-            fill="#18181B"
-            stroke={highContrast ? '#A1A1AA' : '#52525B'}
+            d="M 106 128 L 114 102 L 198 102 L 206 128 Z"
+            fill="#1A1A1F"
+            stroke={highContrast ? '#D4D4D8' : '#71717A'}
             strokeWidth={1.5}
           />
 
           {/* Center Orientation Crosshair */}
-          <Line x1={148} y1={124} x2={148} y2={166} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
-          <Line x1={126} y1={145} x2={170} y2={145} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
-          <Path d="M 143 130 L 148 122 L 153 130" fill="none" stroke="#71717A" strokeWidth={1.5} />
+          <Line x1={156} y1={140} x2={156} y2={182} stroke="rgba(255,255,255,0.09)" strokeWidth={1} />
+          <Line x1={134} y1={161} x2={178} y2={161} stroke="rgba(255,255,255,0.09)" strokeWidth={1} />
+          <Path d="M 151 146 L 156 138 L 161 146" fill="none" stroke="#8E8E98" strokeWidth={1.5} />
 
-          {/* Front-Left Line Sensor Dot (LE) */}
+          {/* Front-Left Line Sensor (LE) — glows high-contrast white/red halo on white line */}
+          {leEdge ? (
+            <Circle cx={120} cy={112} r={11} fill="rgba(239,68,68,0.28)" />
+          ) : null}
           <Circle
-            cx={112}
-            cy={96}
+            cx={120}
+            cy={112}
             r={6}
-            fill={leEdge ? '#EF4444' : '#27272A'}
-            stroke={leEdge ? '#FCA5A5' : '#52525B'}
-            strokeWidth={1.5}
+            fill={leEdge ? '#FAFAFA' : '#27272A'}
+            stroke={leEdge ? '#EF4444' : '#71717A'}
+            strokeWidth={leEdge ? 2.2 : 1.4}
           />
 
-          {/* Front-Right Line Sensor Dot (LD) */}
+          {/* Front-Right Line Sensor (LD) */}
+          {ldEdge ? (
+            <Circle cx={192} cy={112} r={11} fill="rgba(239,68,68,0.28)" />
+          ) : null}
           <Circle
-            cx={184}
-            cy={96}
+            cx={192}
+            cy={112}
             r={6}
-            fill={ldEdge ? '#EF4444' : '#27272A'}
-            stroke={ldEdge ? '#FCA5A5' : '#52525B'}
-            strokeWidth={1.5}
+            fill={ldEdge ? '#FAFAFA' : '#27272A'}
+            stroke={ldEdge ? '#EF4444' : '#71717A'}
+            strokeWidth={ldEdge ? 2.2 : 1.4}
           />
         </Svg>
       </View>
 
-      {/* Line Sensors Numeric Readout Strip (Left / Right aligned under chassis corners) */}
+      {/* Line Sensors Numeric Readout Strip with Dynamic Status Badges */}
       <View style={styles.lineReadouts}>
         <View style={styles.lineCol}>
           <View style={styles.lineHeadRow}>
             <Text style={styles.lineTag}>LINHA ESQ</Text>
-            <Text style={[styles.lineState, leEdge ? styles.edgeAlert : styles.edgeSafe]}>
-              {leEdge ? 'BORDA' : 'PISTA'}
-            </Text>
+            <View style={[styles.badge, leEdge ? styles.badgeEdge : styles.badgeTrack]}>
+              <Text style={[styles.badgeText, leEdge ? styles.badgeTextEdge : styles.badgeTextTrack]}>
+                {leEdge ? 'BORDA' : 'PISTA'}
+              </Text>
+            </View>
           </View>
           <View style={styles.lineValRow}>
-            <Text style={[styles.lineValue, leEdge && { color: '#EF4444' }]}>{sensorLE}</Text>
+            <Text style={[styles.lineValue, leEdge && { color: '#FAFAFA' }]}>{sensorLE}</Text>
             <Text style={styles.lineThr}>≤ {thrLE}</Text>
           </View>
         </View>
@@ -165,12 +209,14 @@ export function RobotRadarSvg({
         <View style={styles.lineCol}>
           <View style={styles.lineHeadRow}>
             <Text style={styles.lineTag}>LINHA DIR</Text>
-            <Text style={[styles.lineState, ldEdge ? styles.edgeAlert : styles.edgeSafe]}>
-              {ldEdge ? 'BORDA' : 'PISTA'}
-            </Text>
+            <View style={[styles.badge, ldEdge ? styles.badgeEdge : styles.badgeTrack]}>
+              <Text style={[styles.badgeText, ldEdge ? styles.badgeTextEdge : styles.badgeTextTrack]}>
+                {ldEdge ? 'BORDA' : 'PISTA'}
+              </Text>
+            </View>
           </View>
           <View style={styles.lineValRow}>
-            <Text style={[styles.lineValue, ldEdge && { color: '#EF4444' }]}>{sensorLD}</Text>
+            <Text style={[styles.lineValue, ldEdge && { color: '#FAFAFA' }]}>{sensorLD}</Text>
             <Text style={styles.lineThr}>≤ {thrLD}</Text>
           </View>
         </View>
@@ -181,24 +227,8 @@ export function RobotRadarSvg({
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingTop: 10,
+    paddingTop: 6,
     paddingBottom: 14,
-  },
-  topLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 34,
-    marginBottom: -4,
-  },
-  arcLabel: {
-    color: '#71717A',
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    letterSpacing: 0.6,
-  },
-  arcLabelActive: {
-    color: '#FF4D00',
   },
   svgContainer: {
     alignItems: 'center',
@@ -207,20 +237,20 @@ const styles = StyleSheet.create({
   lineReadouts: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 4,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: 'rgba(255,255,255,0.09)',
   },
   lineCol: {
     flex: 1,
     paddingHorizontal: 6,
-    gap: 2,
+    gap: 4,
   },
   vDivider: {
     width: 1,
-    height: 36,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.09)',
     marginHorizontal: 8,
   },
   lineHeadRow: {
@@ -229,21 +259,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   lineTag: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
-  lineState: {
-    fontSize: 10,
+  badge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeTrack: {
+    backgroundColor: '#1E1E24',
+  },
+  badgeEdge: {
+    backgroundColor: '#FAFAFA',
+  },
+  badgeText: {
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  edgeAlert: {
-    color: '#EF4444',
+  badgeTextTrack: {
+    color: '#D4D4D8',
   },
-  edgeSafe: {
-    color: '#A1A1AA',
+  badgeTextEdge: {
+    color: '#09090B',
   },
   lineValRow: {
     flexDirection: 'row',
@@ -258,7 +299,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   lineThr: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],

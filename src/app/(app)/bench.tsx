@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import * as React from 'react';
 import {
+  Keyboard,
   Pressable,
   ScrollView,
   Share,
@@ -23,9 +24,26 @@ import {
   View,
 } from 'react-native';
 
-import { useSumoStore } from '@/lib/sumo/store';
+import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
-type BenchTab = 'controle' | 'calibracao' | 'ficha';
+export type BenchTab = 'controle' | 'calibracao' | 'ficha';
+
+const QUICK_CMDS = ['INFO*', 'dados*', 'CAL*', 'PARADA*'] as const;
+
+function logLineColor(entry: ConsoleEntry): string {
+  const lower = entry.text.toLowerCase();
+  if (
+    lower.includes('erro') ||
+    lower.includes('falha') ||
+    lower.includes('sem conexão') ||
+    lower.includes('negada')
+  ) {
+    return '#EF4444';
+  }
+  if (entry.dir === 'tx') return '#38BDF8';
+  if (entry.dir === 'rx') return '#22C55E';
+  return '#A1A1AA';
+}
 
 function SpecRow({
   label,
@@ -50,7 +68,7 @@ function SpecRow({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#52525B"
+          placeholderTextColor="#71717A"
           style={styles.specInput}
         />
         {unit ? <Text style={styles.specUnit}>{unit}</Text> : null}
@@ -59,10 +77,12 @@ function SpecRow({
   );
 }
 
-export default function BenchScreen() {
-  const [subTab, setSubTab] = React.useState<BenchTab>('controle');
+export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }) {
+  const [subTab, setSubTab] = React.useState<BenchTab>(initialTab);
   const [rawCmd, setRawCmd] = React.useState('');
+  const [cmdFocused, setCmdFocused] = React.useState(false);
   const [calFeedback, setCalFeedback] = React.useState<string | null>(null);
+  const logScrollRef = React.useRef<ScrollView>(null);
 
   const logs = useSumoStore((s) => s.logs);
   const telemetry = useSumoStore((s) => s.telemetry);
@@ -79,6 +99,18 @@ export default function BenchScreen() {
   const updateMeasurement = useSumoStore((s) => s.updateMeasurement);
   const exportMeasurementsMarkdown = useSumoStore((s) => s.exportMeasurementsMarkdown);
 
+  // Chronological terminal order: oldest on top, newest anchored at bottom next to input
+  const chronologicalLogs = React.useMemo(() => [...logs.slice(0, 30)].reverse(), [logs]);
+
+  React.useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => setCmdFocused(false));
+    return () => sub.remove();
+  }, []);
+
+  React.useEffect(() => {
+    logScrollRef.current?.scrollToEnd({ animated: false });
+  }, [chronologicalLogs.length]);
+
   const handleSendRaw = () => {
     const clean = rawCmd.trim();
     if (!clean) return;
@@ -94,7 +126,7 @@ export default function BenchScreen() {
 
   const bg = highContrast ? '#000000' : '#09090B';
   const surface = highContrast ? '#111114' : '#121215';
-  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.08)';
+  const divider = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.09)';
 
   return (
     <View style={[styles.screen, { backgroundColor: bg }]}>
@@ -122,45 +154,58 @@ export default function BenchScreen() {
         </View>
       </View>
 
-      {/* SUB-TAB 1: CONTROLE (Split View: Live BLE Console on top + Thumb-Zone D-Pad on bottom) */}
+      {/* SUB-TAB 1: CONTROLE (Split View: Chronological Terminal + Quick Chips + Thumb D-Pad) */}
       {subTab === 'controle' ? (
         <View style={styles.splitWrap}>
-          {/* Top Half: Live BLE NUS Console */}
+          {/* Live BLE NUS Console */}
           <View style={[styles.consolePane, { backgroundColor: surface, borderColor: divider }]}>
             <View style={[styles.consoleHeader, { borderBottomColor: divider }]}>
               <Text style={styles.microLabel}>CONSOLE BLE NUS</Text>
               <Pressable onPress={clearLogs} hitSlop={8}>
-                <Trash2 color="#71717A" size={14} />
+                <Trash2 color="#9A9AA6" size={14} />
               </Pressable>
             </View>
 
-            <ScrollView style={styles.logList} contentContainerStyle={styles.logListContent}>
-              {logs.slice(0, 20).map((item) => (
+            <ScrollView
+              ref={logScrollRef}
+              style={styles.logList}
+              contentContainerStyle={styles.logListContent}
+            >
+              {chronologicalLogs.map((item) => (
                 <Text
                   key={item.id}
-                  style={[
-                    styles.logLine,
-                    {
-                      color:
-                        item.dir === 'tx'
-                          ? '#FF4D00'
-                          : item.dir === 'rx'
-                            ? '#22C55E'
-                            : '#A1A1AA',
-                    },
-                  ]}
+                  style={[styles.logLine, { color: logLineColor(item) }]}
                 >
                   [{item.time}] {item.dir.toUpperCase()} {item.text}
                 </Text>
               ))}
             </ScrollView>
 
+            {/* Quick Command Shortcut Chips */}
+            <View style={[styles.quickChipRow, { borderTopColor: divider }]}>
+              {QUICK_CMDS.map((cmd) => (
+                <Pressable
+                  key={cmd}
+                  onPress={() => {
+                    Vibration.vibrate(15);
+                    void sendRaw(cmd);
+                  }}
+                  style={styles.quickChip}
+                >
+                  <Text style={styles.quickChipText}>{cmd}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Command Input Row */}
             <View style={[styles.cmdBar, { borderTopColor: divider }]}>
               <TextInput
                 value={rawCmd}
                 onChangeText={setRawCmd}
-                placeholder="Comando (INFO*, EST,6*, dados*)"
-                placeholderTextColor="#52525B"
+                onFocus={() => setCmdFocused(true)}
+                onBlur={() => setCmdFocused(false)}
+                placeholder="Comando serial (ex: EST,6*)"
+                placeholderTextColor="#71717A"
                 autoCapitalize="characters"
                 onSubmitEditing={handleSendRaw}
                 style={styles.cmdInput}
@@ -171,74 +216,77 @@ export default function BenchScreen() {
             </View>
           </View>
 
-          {/* Bottom Half: Ergonomic Thumb-Zone D-Pad */}
-          <View style={styles.dpadPane}>
-            <Text style={styles.safetyNote}>
-              Rodas suspensas · segure para acionar · soltar envia parada
-            </Text>
+          {/* Ergonomic Thumb-Zone D-Pad (auto-hides while keyboard is open) */}
+          {!cmdFocused ? (
+            <View style={styles.dpadPane}>
+              <Text style={styles.safetyNote}>
+                Rodas suspensas · segure para acionar · soltar envia parada
+              </Text>
 
-            <View style={styles.dpadGrid}>
-              <View style={styles.dpadRow}>
-                <Pressable
-                  onPressIn={() => {
-                    Vibration.vibrate(20);
-                    void benchJog('FRENTE');
-                  }}
-                  onPressOut={() => void emergencyStop()}
-                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                >
-                  <ArrowUp color="#FAFAFA" size={26} />
-                </Pressable>
-              </View>
+              <View style={styles.dpadGrid}>
+                <View style={styles.dpadRow}>
+                  <Pressable
+                    onPressIn={() => {
+                      Vibration.vibrate(20);
+                      void benchJog('FRENTE');
+                    }}
+                    onPressOut={() => void emergencyStop()}
+                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                  >
+                    <ArrowUp color="#FAFAFA" size={26} />
+                  </Pressable>
+                </View>
 
-              <View style={styles.dpadRow}>
-                <Pressable
-                  onPressIn={() => {
-                    Vibration.vibrate(20);
-                    void benchJog('ESQ');
-                  }}
-                  onPressOut={() => void emergencyStop()}
-                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                >
-                  <ArrowLeft color="#FAFAFA" size={26} />
-                </Pressable>
+                <View style={styles.dpadRow}>
+                  <Pressable
+                    onPressIn={() => {
+                      Vibration.vibrate(20);
+                      void benchJog('ESQ');
+                    }}
+                    onPressOut={() => void emergencyStop()}
+                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                  >
+                    <ArrowLeft color="#FAFAFA" size={26} />
+                  </Pressable>
 
-                <Pressable
-                  onPress={() => {
-                    Vibration.vibrate(90);
-                    void emergencyStop();
-                  }}
-                  style={styles.dpadStop}
-                >
-                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
-                </Pressable>
+                  {/* Softened graphite stop key with subtle red border (global STOP owns red fill) */}
+                  <Pressable
+                    onPress={() => {
+                      Vibration.vibrate(90);
+                      void emergencyStop();
+                    }}
+                    style={styles.dpadStop}
+                  >
+                    <Square color="#EF4444" size={18} fill="#EF4444" />
+                  </Pressable>
 
-                <Pressable
-                  onPressIn={() => {
-                    Vibration.vibrate(20);
-                    void benchJog('DIR');
-                  }}
-                  onPressOut={() => void emergencyStop()}
-                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                >
-                  <ArrowRight color="#FAFAFA" size={26} />
-                </Pressable>
-              </View>
+                  <Pressable
+                    onPressIn={() => {
+                      Vibration.vibrate(20);
+                      void benchJog('DIR');
+                    }}
+                    onPressOut={() => void emergencyStop()}
+                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                  >
+                    <ArrowRight color="#FAFAFA" size={26} />
+                  </Pressable>
+                </View>
 
-              <View style={styles.dpadRow}>
-                <Pressable
-                  onPressIn={() => {
-                    Vibration.vibrate(20);
-                    void benchJog('RE');
-                  }}
-                  onPressOut={() => void emergencyStop()}
-                  style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                >
-                  <ArrowDown color="#FAFAFA" size={26} />
-                </Pressable>
+                <View style={styles.dpadRow}>
+                  <Pressable
+                    onPressIn={() => {
+                      Vibration.vibrate(20);
+                      void benchJog('RE');
+                    }}
+                    onPressOut={() => void emergencyStop()}
+                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
+                  >
+                    <ArrowDown color="#FAFAFA" size={26} />
+                  </Pressable>
+                </View>
               </View>
             </View>
-          </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -282,7 +330,7 @@ export default function BenchScreen() {
           </Pressable>
 
           {calFeedback ? (
-            <View style={[styles.feedbackRow, { borderColor: 'rgba(255,77,0,0.35)' }]}>
+            <View style={[styles.feedbackRow, { borderColor: 'rgba(255,77,0,0.4)' }]}>
               <Text style={styles.feedbackText}>{calFeedback}</Text>
             </View>
           ) : null}
@@ -439,6 +487,10 @@ export default function BenchScreen() {
   );
 }
 
+export default function BenchScreen() {
+  return <BenchView initialTab="controle" />;
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -469,7 +521,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#27272A',
   },
   segBtnText: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -482,7 +534,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 12,
-    gap: 12,
+    gap: 10,
   },
   consolePane: {
     flex: 1,
@@ -496,11 +548,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderBottomWidth: 1,
   },
   microLabel: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
@@ -510,6 +562,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#050507',
   },
   logListContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 4,
@@ -518,6 +572,29 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 11,
     lineHeight: 15,
+  },
+  quickChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    backgroundColor: '#0E0E11',
+  },
+  quickChip: {
+    backgroundColor: '#1C1C22',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  quickChipText: {
+    color: '#D4D4D8',
+    fontFamily: 'monospace',
+    fontSize: 10,
+    fontWeight: '700',
   },
   cmdBar: {
     flexDirection: 'row',
@@ -529,7 +606,7 @@ const styles = StyleSheet.create({
   },
   cmdInput: {
     flex: 1,
-    height: 36,
+    height: 34,
     color: '#FAFAFA',
     fontFamily: 'monospace',
     fontSize: 12,
@@ -538,8 +615,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   cmdSendBtn: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 6,
     backgroundColor: '#FF4D00',
     alignItems: 'center',
@@ -547,26 +624,26 @@ const styles = StyleSheet.create({
   },
   dpadPane: {
     alignItems: 'center',
-    gap: 10,
-    paddingBottom: 4,
+    gap: 8,
+    paddingBottom: 2,
   },
   safetyNote: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 11,
     fontWeight: '500',
   },
   dpadGrid: {
-    gap: 10,
+    gap: 9,
     alignItems: 'center',
   },
   dpadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 9,
   },
   dpadKey: {
     width: 72,
-    height: 62,
+    height: 56,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
@@ -574,11 +651,11 @@ const styles = StyleSheet.create({
   },
   dpadStop: {
     width: 72,
-    height: 62,
+    height: 56,
     borderRadius: 8,
-    backgroundColor: '#DC2626',
-    borderWidth: 1,
-    borderColor: '#EF4444',
+    backgroundColor: '#18181B',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -589,14 +666,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.1,
     marginTop: 6,
   },
   sectionTitleInline: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.1,
@@ -615,7 +692,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   calSub: {
-    color: '#A1A1AA',
+    color: '#B4B4BE',
     fontSize: 11,
     marginTop: 2,
   },
@@ -642,7 +719,7 @@ const styles = StyleSheet.create({
   },
   readoutRight: {
     alignItems: 'flex-end',
-    gap: 1,
+    gap: 2,
   },
   readoutVal: {
     color: '#FAFAFA',
@@ -652,7 +729,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   readoutRef: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontFamily: 'monospace',
   },
@@ -684,14 +761,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   specLabel: {
-    color: '#D4D4D8',
+    color: '#E4E4E7',
     fontSize: 13,
     fontWeight: '500',
   },
   specInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   specInput: {
     color: '#FAFAFA',
@@ -703,15 +780,15 @@ const styles = StyleSheet.create({
     minWidth: 92,
     height: 30,
     paddingVertical: 0,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     textAlignVertical: 'center',
-    backgroundColor: '#121215',
+    backgroundColor: '#161619',
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   specUnit: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontFamily: 'monospace',
     fontSize: 11,
     width: 24,

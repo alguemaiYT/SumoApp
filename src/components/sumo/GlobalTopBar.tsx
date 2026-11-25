@@ -25,13 +25,13 @@ function statusMeta(phase: ConnectionPhase): { dot: string; label: string } {
     case 'in_combat':
       return { dot: '#FF4D00', label: 'Em Combate' };
     case 'bluetooth_off':
-      return { dot: '#EF4444', label: 'BT Off' };
+      return { dot: '#EF4444', label: 'BT Desligado' };
     case 'permissions_denied':
       return { dot: '#EF4444', label: 'Sem Permissão' };
     case 'error':
       return { dot: '#EF4444', label: 'Erro BLE' };
     default:
-      return { dot: '#71717A', label: 'Desconectado' };
+      return { dot: '#8E8E98', label: 'Desconectado' };
   }
 }
 
@@ -47,6 +47,7 @@ export function GlobalTopBar() {
   const connectedDevice = useSumoStore((s) => s.connectedDevice);
   const discoveredDevices = useSumoStore((s) => s.discoveredDevices);
   const vbat = useSumoStore((s) => s.telemetry.Vbat);
+  const fwBranch = useSumoStore((s) => s.info.firmwareBranch);
 
   const startAutoConnect = useSumoStore((s) => s.startAutoConnect);
   const connectDevice = useSumoStore((s) => s.connectDevice);
@@ -77,32 +78,29 @@ export function GlobalTopBar() {
           },
         ]}
       >
-        {/* Left: Connection Pill */}
+        {/* Left: Minimal single-encoded status pill (dot + name, neutral fill) */}
         <Pressable
           onPress={() => setSheetOpen(true)}
           style={[
             styles.pill,
-            {
-              backgroundColor: highContrast ? '#18181B' : '#121215',
-              borderColor: isConnected ? 'rgba(34,197,94,0.35)' : borderCol,
-            },
+            { backgroundColor: highContrast ? '#18181B' : '#141416' },
           ]}
         >
           <View style={[styles.dot, { backgroundColor: meta.dot }]} />
-          <View style={styles.pillTextWrap}>
-            <Text style={styles.pillName} numberOfLines={1}>
-              {deviceLabel}
-            </Text>
+          <Text style={styles.pillName} numberOfLines={1}>
+            {isSimulation ? `${deviceLabel} · SIM` : deviceLabel}
+          </Text>
+          {!isConnected && !isSimulation ? (
             <Text style={styles.pillSub} numberOfLines={1}>
-              {isSimulation ? 'SIM' : meta.label}
+              {meta.label}
             </Text>
-          </View>
+          ) : null}
         </Pressable>
 
-        {/* Right: Compact Vbat + Tactical STOP */}
+        {/* Right: Vbat + generous breathing room before STOP */}
         <View style={styles.rightCluster}>
           <View style={styles.vbatBox}>
-            <Text style={[styles.vbatText, { color: vbat > 0 ? '#FAFAFA' : '#71717A' }]}>
+            <Text style={[styles.vbatText, { color: vbat > 0 ? '#FAFAFA' : '#8E8E98' }]}>
               {vbat > 0 ? `${vbat.toFixed(1)}V` : '--.-V'}
             </Text>
             <View style={styles.vbatTrack}>
@@ -125,15 +123,15 @@ export function GlobalTopBar() {
               isConnected ? styles.stopBtnActive : styles.stopBtnMuted,
             ]}
           >
-            <OctagonAlert color={isConnected ? '#FFFFFF' : '#71717A'} size={14} />
-            <Text style={[styles.stopLabel, { color: isConnected ? '#FFFFFF' : '#71717A' }]}>
+            <OctagonAlert color={isConnected ? '#FFFFFF' : '#8E8E98'} size={14} />
+            <Text style={[styles.stopLabel, { color: isConnected ? '#FFFFFF' : '#8E8E98' }]}>
               STOP
             </Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Connection & Preferences Bottom Sheet Modal */}
+      {/* Connection, Firmware & Display Preferences Bottom Sheet */}
       <Modal
         visible={sheetOpen}
         transparent
@@ -161,23 +159,24 @@ export function GlobalTopBar() {
 
             <View style={styles.sheetStatusRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sheetDevice}>{deviceLabel}</Text>
+                <View style={styles.sheetDeviceRow}>
+                  <Text style={styles.sheetDevice}>{deviceLabel}</Text>
+                  {fwBranch !== 'unknown' ? (
+                    <View style={styles.fwBadge}>
+                      <Text style={styles.fwBadgeText}>fw:{fwBranch}</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text style={styles.sheetDetail} numberOfLines={2}>
-                  {statusDetail || 'Serviço Nordic UART (6e400001)'}
+                  {statusDetail || meta.label}
                 </Text>
               </View>
               {isConnected ? (
-                <Pressable
-                  onPress={() => void disconnect()}
-                  style={styles.secondaryBtn}
-                >
+                <Pressable onPress={() => void disconnect()} style={styles.secondaryBtn}>
                   <Text style={styles.secondaryBtnText}>Desconectar</Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  onPress={() => void startAutoConnect()}
-                  style={styles.primaryBtn}
-                >
+                <Pressable onPress={() => void startAutoConnect()} style={styles.primaryBtn}>
                   <RefreshCw color="#FFFFFF" size={13} />
                   <Text style={styles.primaryBtnText}>Buscar</Text>
                 </Pressable>
@@ -267,11 +266,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
     borderRadius: 8,
-    borderWidth: 1,
-    maxWidth: '54%',
+    maxWidth: '52%',
   },
   dot: {
     width: 8,
@@ -279,25 +277,21 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     flexShrink: 0,
   },
-  pillTextWrap: {
-    flexShrink: 1,
-  },
   pillName: {
     color: '#FAFAFA',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 14,
+    flexShrink: 1,
   },
   pillSub: {
-    color: '#A1A1AA',
-    fontSize: 10,
+    color: '#9A9AA6',
+    fontSize: 11,
     fontWeight: '600',
-    lineHeight: 12,
   },
   rightCluster: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 16,
   },
   vbatBox: {
     alignItems: 'flex-end',
@@ -326,7 +320,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 6,
     borderWidth: 1,
@@ -336,7 +330,7 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
   },
   stopBtnMuted: {
-    backgroundColor: '#121215',
+    backgroundColor: '#141416',
     borderColor: 'rgba(255,255,255,0.12)',
   },
   stopLabel: {
@@ -383,10 +377,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  sheetDeviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sheetDevice: {
     color: '#FAFAFA',
     fontSize: 14,
     fontWeight: '700',
+  },
+  fwBadge: {
+    backgroundColor: '#27272A',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  fwBadgeText: {
+    color: '#D4D4D8',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   sheetDetail: {
     color: '#A1A1AA',
@@ -434,7 +445,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sectionMicro: {
-    color: '#71717A',
+    color: '#9A9AA6',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
