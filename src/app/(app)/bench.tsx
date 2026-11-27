@@ -83,6 +83,116 @@ function SpecRow({
   );
 }
 
+function BenchCalibrationReadouts({
+  divider,
+  surface,
+}: {
+  divider: string;
+  surface: string;
+}) {
+  const telemetry = useSumoStore((s) => s.telemetry);
+  const info = useSumoStore((s) => s.info);
+  const sensorLatch = useSumoStore((s) => s.sensorLatch);
+  const resetSensorLatch = useSumoStore((s) => s.resetSensorLatch);
+  const bat = lipo2sStatus(telemetry.Vbat);
+
+  return (
+    <>
+      <View style={styles.fichaHeader}>
+        <Text style={styles.sectionTitleInline}>DIAGNÓSTICO DE PINOS IR (LATCH)</Text>
+        <Pressable
+          onPress={resetSensorLatch}
+          style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
+        >
+          <Text style={styles.miniBtnText}>Limpar</Text>
+        </Pressable>
+      </View>
+      <View style={[styles.pinDiagGrid, { borderColor: divider, backgroundColor: surface }]}>
+        {(
+          [
+            { name: 'SE', gpio: '35', val: telemetry.sen_esq, count: sensorLatch.se },
+            { name: 'SCE', gpio: '32', val: telemetry.sen_centro_esq, count: sensorLatch.sce },
+            { name: 'SCD', gpio: '33', val: telemetry.sen_centro_dir, count: sensorLatch.scd },
+            { name: 'SD', gpio: '25', val: telemetry.sen_dir, count: sensorLatch.sd },
+          ] as const
+        ).map((pin, idx) => {
+          const on = pin.val === 1;
+          return (
+            <View
+              key={pin.name}
+              style={[
+                styles.pinDiagCell,
+                idx > 0 && { borderLeftWidth: 1, borderLeftColor: divider },
+              ]}
+            >
+              <Text style={styles.pinDiagLabel}>
+                {pin.name}·{pin.gpio}
+              </Text>
+              <Text style={[styles.pinDiagVal, on && { color: '#FF4D00' }]}>
+                {pin.val}
+              </Text>
+              <Text style={styles.pinDiagLatch}>×{pin.count}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <Text style={styles.sectionTitle}>LEITURA E LIMIARES ATUAIS</Text>
+      <View style={[styles.readoutTable, { borderTopColor: divider }]}>
+        {[
+          {
+            k: 'Bateria LiPo 2S',
+            cur: telemetry.Vbat > 0 ? `${telemetry.Vbat.toFixed(2)} V` : '--.-- V',
+            ref:
+              bat.level === 'none'
+                ? 'aguardando telemetria'
+                : bat.level === 'usb'
+                  ? 'alimentação USB'
+                  : `${bat.cellV.toFixed(2)} V/cél · ${bat.pct}%${bat.level !== 'ok' ? ' · RECARREGAR' : ''}`,
+            warn: bat.level === 'low' || bat.level === 'critical',
+          },
+          {
+            k: 'Inclinação (Pitch / Roll)',
+            cur: `${fmtSigned(info.pitchDeg, 1)}° / ${fmtSigned(info.rollDeg, 1)}°`,
+            ref: 'gravidade absoluta',
+            warn: false,
+          },
+          {
+            k: 'Yaw / Giroscópio',
+            cur: `${info.headingDeg.toFixed(1)}°`,
+            ref: `gz ${info.gz.toFixed(1)} °/s`,
+            warn: false,
+          },
+          {
+            k: 'Linha Esq (LE · 39)',
+            cur: `${telemetry.sensorLE}`,
+            ref: `limiar ≤ ${info.linhaLimiarEsq}`,
+            warn: false,
+          },
+          {
+            k: 'Linha Dir (LD · 26)',
+            cur: `${telemetry.sensorLD}`,
+            ref: `limiar ≤ ${info.linhaLimiarDir}`,
+            warn: false,
+          },
+        ].map((row) => (
+          <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
+            <Text style={styles.specLabel}>{row.k}</Text>
+            <View style={styles.readoutRight}>
+              <Text style={[styles.readoutVal, row.warn && { color: '#F59E0B' }]}>
+                {row.cur}
+              </Text>
+              <Text style={[styles.readoutRef, row.warn && { color: '#F59E0B' }]}>
+                {row.ref}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
 export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }) {
   const [subTab, setSubTab] = React.useState<BenchTab>(initialTab);
   const [rawCmd, setRawCmd] = React.useState('');
@@ -91,11 +201,8 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const logScrollRef = React.useRef<ScrollView>(null);
 
   const logs = useSumoStore((s) => s.logs);
-  const telemetry = useSumoStore((s) => s.telemetry);
-  const info = useSumoStore((s) => s.info);
   const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
-  const sensorLatch = useSumoStore((s) => s.sensorLatch);
   const activePulseMotor = useSumoStore((s) => s.activePulseMotor);
 
   const emergencyStop = useSumoStore((s) => s.emergencyStop);
@@ -105,12 +212,9 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const benchMotorPulse = useSumoStore((s) => s.benchMotorPulse);
   const sendRaw = useSumoStore((s) => s.sendRaw);
   const clearLogs = useSumoStore((s) => s.clearLogs);
-  const resetSensorLatch = useSumoStore((s) => s.resetSensorLatch);
   const updateMeasurement = useSumoStore((s) => s.updateMeasurement);
   const captureTelemetryToMeasurements = useSumoStore((s) => s.captureTelemetryToMeasurements);
   const exportMeasurementsMarkdown = useSumoStore((s) => s.exportMeasurementsMarkdown);
-
-  const bat = lipo2sStatus(telemetry.Vbat);
 
   // Chronological terminal order: oldest on top, newest anchored at bottom next to input
   const chronologicalLogs = React.useMemo(() => [...logs.slice(0, 30)].reverse(), [logs]);
@@ -387,97 +491,7 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
             </View>
           ) : null}
 
-          <View style={styles.fichaHeader}>
-            <Text style={styles.sectionTitleInline}>DIAGNÓSTICO DE PINOS IR (LATCH)</Text>
-            <Pressable
-              onPress={resetSensorLatch}
-              style={[styles.miniBtn, { borderColor: divider, backgroundColor: surface }]}
-            >
-              <Text style={styles.miniBtnText}>Limpar</Text>
-            </Pressable>
-          </View>
-          <View style={[styles.pinDiagGrid, { borderColor: divider, backgroundColor: surface }]}>
-            {(
-              [
-                { name: 'SE', gpio: '35', val: telemetry.sen_esq, count: sensorLatch.se },
-                { name: 'SCE', gpio: '32', val: telemetry.sen_centro_esq, count: sensorLatch.sce },
-                { name: 'SCD', gpio: '33', val: telemetry.sen_centro_dir, count: sensorLatch.scd },
-                { name: 'SD', gpio: '25', val: telemetry.sen_dir, count: sensorLatch.sd },
-              ] as const
-            ).map((pin, idx) => {
-              const on = pin.val === 1;
-              return (
-                <View
-                  key={pin.name}
-                  style={[
-                    styles.pinDiagCell,
-                    idx > 0 && { borderLeftWidth: 1, borderLeftColor: divider },
-                  ]}
-                >
-                  <Text style={styles.pinDiagLabel}>
-                    {pin.name}·{pin.gpio}
-                  </Text>
-                  <Text style={[styles.pinDiagVal, on && { color: '#FF4D00' }]}>
-                    {pin.val}
-                  </Text>
-                  <Text style={styles.pinDiagLatch}>×{pin.count}</Text>
-                </View>
-              );
-            })}
-          </View>
-
-          <Text style={styles.sectionTitle}>LEITURA E LIMIARES ATUAIS</Text>
-          <View style={[styles.readoutTable, { borderTopColor: divider }]}>
-            {[
-              {
-                k: 'Bateria LiPo 2S',
-                cur: telemetry.Vbat > 0 ? `${telemetry.Vbat.toFixed(2)} V` : '--.-- V',
-                ref:
-                  bat.level === 'none'
-                    ? 'aguardando telemetria'
-                    : bat.level === 'usb'
-                      ? 'alimentação USB'
-                      : `${bat.cellV.toFixed(2)} V/cél · ${bat.pct}%${bat.level !== 'ok' ? ' · RECARREGAR' : ''}`,
-                warn: bat.level === 'low' || bat.level === 'critical',
-              },
-              {
-                k: 'Inclinação (Pitch / Roll)',
-                cur: `${fmtSigned(info.pitchDeg, 1)}° / ${fmtSigned(info.rollDeg, 1)}°`,
-                ref: 'gravidade absoluta',
-                warn: false,
-              },
-              {
-                k: 'Yaw / Giroscópio',
-                cur: `${info.headingDeg.toFixed(1)}°`,
-                ref: `gz ${info.gz.toFixed(1)} °/s`,
-                warn: false,
-              },
-              {
-                k: 'Linha Esq (LE · 39)',
-                cur: `${telemetry.sensorLE}`,
-                ref: `limiar ≤ ${info.linhaLimiarEsq}`,
-                warn: false,
-              },
-              {
-                k: 'Linha Dir (LD · 26)',
-                cur: `${telemetry.sensorLD}`,
-                ref: `limiar ≤ ${info.linhaLimiarDir}`,
-                warn: false,
-              },
-            ].map((row) => (
-              <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
-                <Text style={styles.specLabel}>{row.k}</Text>
-                <View style={styles.readoutRight}>
-                  <Text style={[styles.readoutVal, row.warn && { color: '#F59E0B' }]}>
-                    {row.cur}
-                  </Text>
-                  <Text style={[styles.readoutRef, row.warn && { color: '#F59E0B' }]}>
-                    {row.ref}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          <BenchCalibrationReadouts divider={divider} surface={surface} />
         </ScrollView>
       ) : null}
 

@@ -95,6 +95,12 @@ export class SumoBleTransport {
   private preferredDeviceId: string | null = null;
   private lastKnownMatchReady = false;
   private callbacks: BleTransportCallbacks;
+  private txBusy = false;
+  private txQueue: Array<{
+    cmd: string;
+    coalescable: boolean;
+    resolve: (ok: boolean) => void;
+  }> = [];
 
   constructor(callbacks: BleTransportCallbacks) {
     this.callbacks = callbacks;
@@ -264,10 +270,58 @@ export class SumoBleTransport {
     }
   }
 
-  public async sendCommand(cmd: string): Promise<boolean> {
-    const dev = this.activeDevice;
-    if (!dev) return false;
+  public async sendCommand(
+    cmd: string,
+    opts?: { coalescable?: boolean; urgent?: boolean },
+  ): Promise<boolean> {
+    if (!this.activeDevice) return false;
+    const coalescable = opts?.coalescable === true;
+    const urgent = opts?.urgent === true;
 
+    // Never pile up periodic polling commands while another GATT write is active or queued
+    if (coalescable && (this.txBusy || this.txQueue.length > 0)) {
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      if (urgent) {
+        // Drop queued low-priority polls so PARADA* executes immediately
+        for (let i = this.txQueue.length - 1; i >= 0; i--) {
+          if (this.txQueue[i].coalescable) {
+            this.txQueue[i].resolve(true);
+            this.txQueue.splice(i, 1);
+          }
+        }
+        this.txQueue.unshift({ cmd, coalescable: false, resolve });
+      } else {
+        this.txQueue.push({ cmd, coalescable, resolve });
+      }
+      if (!this.txBusy) {
+        void this.drainTxQueue();
+      }
+    });
+  }
+
+  private async drainTxQueue(): Promise<void> {
+    if (this.txBusy) return;
+    this.txBusy = true;
+    try {
+      while (this.txQueue.length > 0) {
+        const item = this.txQueue.shift()!;
+        const dev = this.activeDevice;
+        if (!dev) {
+          item.resolve(false);
+          continue;
+        }
+        const ok = await this.writeOnce(dev, item.cmd);
+        item.resolve(ok);
+      }
+    } finally {
+      this.txBusy = false;
+    }
+  }
+
+  private async writeOnce(dev: Device, cmd: string): Promise<boolean> {
     const payload = encodeUtf8ToBase64(cmd);
     this.callbacks.onRawTx?.(cmd);
 
@@ -292,9 +346,16 @@ export class SumoBleTransport {
     }
   }
 
+  private clearTxQueue(): void {
+    while (this.txQueue.length > 0) {
+      this.txQueue.shift()?.resolve(false);
+    }
+  }
+
   public async disconnect(): Promise<void> {
     this.manualDisconnect = true;
     this.clearReconnectTimer();
+    this.clearTxQueue();
     this.stopScan();
     this.monitorSub?.remove();
     this.monitorSub = null;
@@ -322,6 +383,7 @@ export class SumoBleTransport {
   }
 
   private handleUnexpectedDisconnect(): void {
+    this.clearTxQueue();
     this.monitorSub?.remove();
     this.monitorSub = null;
     this.disconnectSub?.remove();

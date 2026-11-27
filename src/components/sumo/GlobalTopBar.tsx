@@ -47,7 +47,7 @@ export function GlobalTopBar() {
   const highContrast = useSumoStore((s) => s.highContrast);
   const connectedDevice = useSumoStore((s) => s.connectedDevice);
   const discoveredDevices = useSumoStore((s) => s.discoveredDevices);
-  const vbat = useSumoStore((s) => s.telemetry.Vbat);
+  const vbat = useSumoStore((s) => Math.round(s.telemetry.Vbat * 10) / 10);
   const fwBranch = useSumoStore((s) => s.info.firmwareBranch);
 
   const startAutoConnect = useSumoStore((s) => s.startAutoConnect);
@@ -151,12 +151,13 @@ export function GlobalTopBar() {
       </View>
 
       {/* Connection, Firmware & Display Preferences Bottom Sheet */}
-      <Modal
-        visible={sheetOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSheetOpen(false)}
-      >
+      {sheetOpen ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSheetOpen(false)}
+        >
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setSheetOpen(false)} />
           <View style={styles.sheet}>
@@ -272,6 +273,7 @@ export function GlobalTopBar() {
           </View>
         </View>
       </Modal>
+      ) : null}
     </>
   );
 }

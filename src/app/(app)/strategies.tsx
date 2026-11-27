@@ -16,7 +16,8 @@ const SHORT_SUMMARY: Record<StrategyId, string> = {
 };
 
 export default function StrategiesScreen() {
-  const info = useSumoStore((s) => s.info);
+  const estrategia = useSumoStore((s) => s.info.estrategia);
+  const irStartDelayMs = useSumoStore((s) => s.info.irStartDelayMs);
   const phase = useSumoStore((s) => s.phase);
   const highContrast = useSumoStore((s) => s.highContrast);
   const setStrategy = useSumoStore((s) => s.setStrategy);
@@ -24,25 +25,25 @@ export default function StrategiesScreen() {
 
   const [rulesModalOpen, setRulesModalOpen] = React.useState(false);
   const [eepromPulse, setEepromPulse] = React.useState(false);
-  const prevStratRef = React.useRef(info.estrategia);
-  const prevIrRef = React.useRef(info.irStartDelayMs);
+  const prevStratRef = React.useRef(estrategia);
+  const prevIrRef = React.useRef(irStartDelayMs);
 
   React.useEffect(() => {
     if (
-      prevStratRef.current !== info.estrategia ||
-      prevIrRef.current !== info.irStartDelayMs
+      prevStratRef.current !== estrategia ||
+      prevIrRef.current !== irStartDelayMs
     ) {
-      prevStratRef.current = info.estrategia;
-      prevIrRef.current = info.irStartDelayMs;
+      prevStratRef.current = estrategia;
+      prevIrRef.current = irStartDelayMs;
       setEepromPulse(true);
       const t = setTimeout(() => setEepromPulse(false), 1800);
       return () => clearTimeout(t);
     }
     return undefined;
-  }, [info.estrategia, info.irStartDelayMs]);
+  }, [estrategia, irStartDelayMs]);
 
   const handleSelectStrategy = (id: StrategyId) => {
-    if (id === info.estrategia) return;
+    if (id === estrategia) return;
     Vibration.vibrate(35);
     void setStrategy(id);
     if (phase === 'connected') {
@@ -52,7 +53,7 @@ export default function StrategiesScreen() {
   };
 
   const confirmIrRule = (ms: number) => {
-    if (ms === info.irStartDelayMs) return;
+    if (ms === irStartDelayMs) return;
     const label = ms === 0 ? '0s · Módulo Juiz (imediato)' : '+5s · Contagem Interna';
     Alert.alert(
       'Alterar regra de partida IR',
@@ -76,7 +77,7 @@ export default function StrategiesScreen() {
 
   const mainGrid = STRATEGIES.slice(0, 6);
   const lineStrategy = STRATEGIES[6];
-  const activeStrat = STRATEGIES.find((s) => s.id === info.estrategia) ?? STRATEGIES[0];
+  const activeStrat = STRATEGIES.find((s) => s.id === estrategia) ?? STRATEGIES[0];
 
   return (
     <View style={[styles.screen, { backgroundColor: bg }]}>
@@ -109,7 +110,7 @@ export default function StrategiesScreen() {
               { ms: 0, label: '0s · Juiz' },
               { ms: 5000, label: '+5s · Interno' },
             ].map((opt) => {
-              const active = info.irStartDelayMs === opt.ms;
+              const active = irStartDelayMs === opt.ms;
               return (
                 <Pressable
                   key={opt.ms}
@@ -128,7 +129,7 @@ export default function StrategiesScreen() {
         {/* Dense 2x3 Combat Strategy Grid (01..06, ZERO redundant info icons) */}
         <View style={styles.grid}>
           {mainGrid.map((st) => {
-            const selected = info.estrategia === st.id;
+            const selected = estrategia === st.id;
             return (
               <Pressable
                 key={st.id}
@@ -173,8 +174,8 @@ export default function StrategiesScreen() {
               styles.rowTile,
               {
                 backgroundColor:
-                  info.estrategia === lineStrategy.id ? 'rgba(255, 77, 0, 0.11)' : surface,
-                borderColor: info.estrategia === lineStrategy.id ? '#FF4D00' : border,
+                  estrategia === lineStrategy.id ? 'rgba(255, 77, 0, 0.11)' : surface,
+                borderColor: estrategia === lineStrategy.id ? '#FF4D00' : border,
               },
             ]}
           >
@@ -182,7 +183,7 @@ export default function StrategiesScreen() {
               <Text
                 style={[
                   styles.tileIndex,
-                  info.estrategia === lineStrategy.id && { color: '#FF4D00' },
+                  estrategia === lineStrategy.id && { color: '#FF4D00' },
                 ]}
               >
                 07
@@ -192,7 +193,7 @@ export default function StrategiesScreen() {
                 <Text style={styles.tileSummary}>{SHORT_SUMMARY[7]}</Text>
               </View>
             </View>
-            {info.estrategia === lineStrategy.id ? (
+            {estrategia === lineStrategy.id ? (
               <View style={styles.activePill}>
                 <Text style={styles.activePillText}>ATIVO</Text>
               </View>

@@ -171,38 +171,42 @@ const PRESET_SHORT: Record<string, string> = {
 };
 
 export default function TuningScreen() {
-  const telemetry = useSumoStore((s) => s.telemetry);
-  const info = useSumoStore((s) => s.info);
+  const savedVelocreta = useSumoStore((s) => s.telemetry.velocreta);
+  const savedVelocgiro = useSumoStore((s) => s.telemetry.velocgiro);
+  const savedHbevasao = useSumoStore((s) => s.telemetry.HBEvasao);
+  const savedLimiarParado = useSumoStore((s) => s.telemetry.limiarParado);
+  const savedLimiarEmpurrado = useSumoStore((s) => s.telemetry.limiarEmpurrado);
+  const irStartDelayMs = useSumoStore((s) => s.info.irStartDelayMs);
   const highContrast = useSumoStore((s) => s.highContrast);
   const saveTuning = useSumoStore((s) => s.saveTuning);
   const resetRobotConfig = useSumoStore((s) => s.resetRobotConfig);
 
-  const [velocreta, setVelocreta] = React.useState(telemetry.velocreta);
-  const [velocgiro, setVelocgiro] = React.useState(telemetry.velocgiro);
-  const [hbevasao, setHbevasao] = React.useState(telemetry.HBEvasao);
-  const [limiarParado, setLimiarParado] = React.useState(telemetry.limiarParado);
-  const [limiarEmpurrado, setLimiarEmpurrado] = React.useState(telemetry.limiarEmpurrado);
+  const [velocreta, setVelocreta] = React.useState(savedVelocreta);
+  const [velocgiro, setVelocgiro] = React.useState(savedVelocgiro);
+  const [hbevasao, setHbevasao] = React.useState(savedHbevasao);
+  const [limiarParado, setLimiarParado] = React.useState(savedLimiarParado);
+  const [limiarEmpurrado, setLimiarEmpurrado] = React.useState(savedLimiarEmpurrado);
 
   React.useEffect(() => {
-    setVelocreta(telemetry.velocreta);
-    setVelocgiro(telemetry.velocgiro);
-    setHbevasao(telemetry.HBEvasao);
-    setLimiarParado(telemetry.limiarParado);
-    setLimiarEmpurrado(telemetry.limiarEmpurrado);
+    setVelocreta(savedVelocreta);
+    setVelocgiro(savedVelocgiro);
+    setHbevasao(savedHbevasao);
+    setLimiarParado(savedLimiarParado);
+    setLimiarEmpurrado(savedLimiarEmpurrado);
   }, [
-    telemetry.velocreta,
-    telemetry.velocgiro,
-    telemetry.HBEvasao,
-    telemetry.limiarParado,
-    telemetry.limiarEmpurrado,
+    savedVelocreta,
+    savedVelocgiro,
+    savedHbevasao,
+    savedLimiarParado,
+    savedLimiarEmpurrado,
   ]);
 
   const changesCount =
-    (velocreta !== telemetry.velocreta ? 1 : 0) +
-    (velocgiro !== telemetry.velocgiro ? 1 : 0) +
-    (hbevasao !== telemetry.HBEvasao ? 1 : 0) +
-    (Math.abs(limiarParado - telemetry.limiarParado) > 0.001 ? 1 : 0) +
-    (Math.abs(limiarEmpurrado - telemetry.limiarEmpurrado) > 0.001 ? 1 : 0);
+    (velocreta !== savedVelocreta ? 1 : 0) +
+    (velocgiro !== savedVelocgiro ? 1 : 0) +
+    (hbevasao !== savedHbevasao ? 1 : 0) +
+    (Math.abs(limiarParado - savedLimiarParado) > 0.001 ? 1 : 0) +
+    (Math.abs(limiarEmpurrado - savedLimiarEmpurrado) > 0.001 ? 1 : 0);
 
   const isDirty = changesCount > 0;
 
@@ -216,11 +220,11 @@ export default function TuningScreen() {
   };
 
   const discardDraft = () => {
-    setVelocreta(telemetry.velocreta);
-    setVelocgiro(telemetry.velocgiro);
-    setHbevasao(telemetry.HBEvasao);
-    setLimiarParado(telemetry.limiarParado);
-    setLimiarEmpurrado(telemetry.limiarEmpurrado);
+    setVelocreta(savedVelocreta);
+    setVelocgiro(savedVelocgiro);
+    setHbevasao(savedHbevasao);
+    setLimiarParado(savedLimiarParado);
+    setLimiarEmpurrado(savedLimiarEmpurrado);
   };
 
   const confirmReset = () => {
@@ -297,7 +301,7 @@ export default function TuningScreen() {
             code="VR"
             unit="PWM"
             value={velocreta}
-            savedValue={telemetry.velocreta}
+            savedValue={savedVelocreta}
             onChange={setVelocreta}
             step={5}
             min={0}
@@ -309,7 +313,7 @@ export default function TuningScreen() {
             code="VG"
             unit="PWM"
             value={velocgiro}
-            savedValue={telemetry.velocgiro}
+            savedValue={savedVelocgiro}
             onChange={setVelocgiro}
             step={5}
             min={0}
@@ -324,7 +328,7 @@ export default function TuningScreen() {
           <View style={[styles.switchRow, { borderBottomColor: divider }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={styles.paramLabelWrap}>
-                {hbevasao !== telemetry.HBEvasao ? <View style={styles.dirtyDot} /> : null}
+                {hbevasao !== savedHbevasao ? <View style={styles.dirtyDot} /> : null}
                 <Text style={styles.paramLabel}>Evasão por Impasse / Impacto</Text>
                 <Text style={styles.paramCode}>HBE</Text>
               </View>
@@ -343,7 +347,7 @@ export default function TuningScreen() {
             code="LIP"
             unit="m/s²"
             value={limiarParado}
-            savedValue={telemetry.limiarParado}
+            savedValue={savedLimiarParado}
             onChange={setLimiarParado}
             step={0.05}
             min={0.02}
@@ -356,7 +360,7 @@ export default function TuningScreen() {
             code="LIE"
             unit="m/s²"
             value={limiarEmpurrado}
-            savedValue={telemetry.limiarEmpurrado}
+            savedValue={savedLimiarEmpurrado}
             onChange={setLimiarEmpurrado}
             step={0.05}
             min={-3.0}
@@ -392,7 +396,7 @@ export default function TuningScreen() {
                   HBEvasao: hbevasao,
                   limiarParado,
                   limiarEmpurrado,
-                  irStartDelayMs: info.irStartDelayMs,
+                  irStartDelayMs,
                 });
               }}
               style={styles.saveBtnActive}

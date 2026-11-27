@@ -1,6 +1,11 @@
-// Pure RFC-4648 UTF-8 <-> Base64 utilities (zero Node Buffer polyfill required)
+// Pure RFC-4648 UTF-8 <-> Base64 utilities (zero Node Buffer polyfill, O(1) LUT)
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+const DECODE_LUT = new Int8Array(128).fill(-1);
+for (let i = 0; i < CHARS.length; i++) {
+  DECODE_LUT[CHARS.charCodeAt(i)] = i;
+}
 
 export function encodeUtf8ToBase64(input: string): string {
   const bytes: number[] = [];
@@ -35,19 +40,43 @@ export function encodeUtf8ToBase64(input: string): string {
 }
 
 export function decodeBase64ToUtf8(b64: string): string {
-  const clean = b64.replace(/[^A-Za-z0-9+/=]/g, '');
   const bytes: number[] = [];
+  let q0 = -1;
+  let q1 = -1;
+  let q2 = -1;
+  let count = 0;
 
-  for (let i = 0; i < clean.length; i += 4) {
-    const c0 = CHARS.indexOf(clean[i]);
-    const c1 = CHARS.indexOf(clean[i + 1]);
-    const c2 = clean[i + 2] === '=' ? -1 : CHARS.indexOf(clean[i + 2]);
-    const c3 = clean[i + 3] === '=' ? -1 : CHARS.indexOf(clean[i + 3]);
-    if (c0 < 0 || c1 < 0) continue;
+  for (let i = 0; i < b64.length; i++) {
+    const code = b64.charCodeAt(i);
+    if (code === 61 /* '=' */) {
+      if (count === 2) {
+        bytes.push((q0 << 2) | (q1 >> 4));
+      } else if (count === 3) {
+        bytes.push((q0 << 2) | (q1 >> 4));
+        bytes.push(((q1 & 0x0f) << 4) | (q2 >> 2));
+      }
+      count = 0;
+      break;
+    }
+    if (code >= 128) continue;
+    const val = DECODE_LUT[code];
+    if (val < 0) continue;
 
-    bytes.push((c0 << 2) | (c1 >> 4));
-    if (c2 >= 0) bytes.push(((c1 & 0x0f) << 4) | (c2 >> 2));
-    if (c3 >= 0) bytes.push(((c2 & 0x03) << 6) | c3);
+    if (count === 0) {
+      q0 = val;
+      count = 1;
+    } else if (count === 1) {
+      q1 = val;
+      count = 2;
+    } else if (count === 2) {
+      q2 = val;
+      count = 3;
+    } else {
+      bytes.push((q0 << 2) | (q1 >> 4));
+      bytes.push(((q1 & 0x0f) << 4) | (q2 >> 2));
+      bytes.push(((q2 & 0x03) << 6) | val);
+      count = 0;
+    }
   }
 
   let out = '';

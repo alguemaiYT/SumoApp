@@ -15,7 +15,7 @@ interface RobotRadarProps {
   highContrast?: boolean;
 }
 
-export function RobotRadarSvg({
+export const RobotRadarSvg = React.memo(function RobotRadarSvg({
   senEsq,
   senCentroEsq,
   senCentroDir,
@@ -242,7 +242,7 @@ export function RobotRadarSvg({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {

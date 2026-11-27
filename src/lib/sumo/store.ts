@@ -1,4 +1,4 @@
-import { Vibration } from 'react-native';
+import { AppState, type AppStateStatus, Vibration } from 'react-native';
 import { create } from 'zustand';
 
 import { getItem, setItem } from '@/lib/storage';
@@ -195,10 +195,67 @@ interface SumoStore {
   exportMeasurementsMarkdown: () => string;
 }
 
+export interface LiveTelemetrySnapshot {
+  connected: boolean;
+  appActive: boolean;
+  telemetry: TelemetryData;
+  info: RobotInfoData;
+}
+
+type LiveTelemetryListener = (snap: LiveTelemetrySnapshot) => void;
+
+const UI_COMMIT_INTERVAL_MS = 140;
+
 let transport: SumoBleTransport | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let motorPulseTimer: ReturnType<typeof setTimeout> | null = null;
+let uiFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let appStateSub: { remove: () => void } | null = null;
 let pollTick = 0;
+
+let liveAppActive = true;
+let liveConnected = false;
+let liveTelemetry: TelemetryData = DEFAULT_TELEMETRY;
+let liveInfo: RobotInfoData = DEFAULT_INFO;
+let pendingTelemetry: TelemetryData | null = null;
+let pendingInfo: RobotInfoData | null = null;
+let pendingLatchDelta: SensorLatchCounts | null = null;
+const liveListeners = new Set<LiveTelemetryListener>();
+
+export function getLiveTelemetrySnapshot(): LiveTelemetrySnapshot {
+  return {
+    connected: liveConnected,
+    appActive: liveAppActive,
+    telemetry: liveTelemetry,
+    info: liveInfo,
+  };
+}
+
+export function subscribeLiveTelemetry(listener: LiveTelemetryListener): () => void {
+  liveListeners.add(listener);
+  return () => {
+    liveListeners.delete(listener);
+  };
+}
+
+function notifyLiveListeners(): void {
+  if (liveListeners.size === 0) return;
+  const snap = getLiveTelemetrySnapshot();
+  liveListeners.forEach((fn) => {
+    try {
+      fn(snap);
+    } catch {
+      // keep telemetry bus resilient
+    }
+  });
+}
+
+function clearUiFlushTimer(): void {
+  if (uiFlushTimer) {
+    clearTimeout(uiFlushTimer);
+    uiFlushTimer = null;
+  }
+}
 
 function clearMotorPulseTimer(): void {
   if (motorPulseTimer) {
@@ -235,17 +292,54 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     }));
   };
 
+  const flushUiUpdates = () => {
+    clearUiFlushTimer();
+    const nextTel = pendingTelemetry;
+    const nextInfo = pendingInfo;
+    const latchDelta = pendingLatchDelta;
+    pendingTelemetry = null;
+    pendingInfo = null;
+    pendingLatchDelta = null;
+    if (!nextTel && !nextInfo && !latchDelta) return;
+
+    set((s) => {
+      const patch: Partial<SumoStore> = {};
+      if (nextTel) patch.telemetry = nextTel;
+      if (nextInfo) patch.info = nextInfo;
+      if (latchDelta) {
+        patch.sensorLatch = {
+          se: s.sensorLatch.se + latchDelta.se,
+          sce: s.sensorLatch.sce + latchDelta.sce,
+          scd: s.sensorLatch.scd + latchDelta.scd,
+          sd: s.sensorLatch.sd + latchDelta.sd,
+        };
+      }
+      return patch;
+    });
+  };
+
+  const scheduleUiFlush = (immediate: boolean) => {
+    if (!liveAppActive) return;
+    if (immediate) {
+      flushUiUpdates();
+      return;
+    }
+    if (!uiFlushTimer) {
+      uiFlushTimer = setTimeout(flushUiUpdates, UI_COMMIT_INTERVAL_MS);
+    }
+  };
+
   const handleIncomingLine = (line: string) => {
     const dados = parseDadosLine(line);
     if (dados) {
-      const prev = get().telemetry;
+      const prev = liveTelemetry;
       const seRise = prev.sen_esq === 0 && dados.sen_esq === 1;
       const sceRise = prev.sen_centro_esq === 0 && dados.sen_centro_esq === 1;
       const scdRise = prev.sen_centro_dir === 0 && dados.sen_centro_dir === 1;
       const sdRise = prev.sen_dir === 0 && dados.sen_dir === 1;
       const anyRise = seRise || sceRise || scdRise || sdRise;
 
-      if (anyRise && get().hapticOnDetect) {
+      if (anyRise && liveAppActive && get().hapticOnDetect) {
         try {
           Vibration?.vibrate?.(25);
         } catch {
@@ -253,23 +347,57 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         }
       }
 
-      set((s) => ({
-        telemetry: dados,
-        sensorLatch: anyRise
-          ? {
-              se: s.sensorLatch.se + (seRise ? 1 : 0),
-              sce: s.sensorLatch.sce + (sceRise ? 1 : 0),
-              scd: s.sensorLatch.scd + (scdRise ? 1 : 0),
-              sd: s.sensorLatch.sd + (sdRise ? 1 : 0),
-            }
-          : s.sensorLatch,
-      }));
+      const prevLeEdge = prev.sensorLE <= liveInfo.linhaLimiarEsq;
+      const prevLdEdge = prev.sensorLD <= liveInfo.linhaLimiarDir;
+      const nextLeEdge = dados.sensorLE <= liveInfo.linhaLimiarEsq;
+      const nextLdEdge = dados.sensorLD <= liveInfo.linhaLimiarDir;
+
+      const discreteChanged =
+        prev.sen_esq !== dados.sen_esq ||
+        prev.sen_centro_esq !== dados.sen_centro_esq ||
+        prev.sen_centro_dir !== dados.sen_centro_dir ||
+        prev.sen_dir !== dados.sen_dir ||
+        prevLeEdge !== nextLeEdge ||
+        prevLdEdge !== nextLdEdge ||
+        prev.velocreta !== dados.velocreta ||
+        prev.velocgiro !== dados.velocgiro ||
+        prev.HBEvasao !== dados.HBEvasao ||
+        prev.limiarParado !== dados.limiarParado ||
+        prev.limiarEmpurrado !== dados.limiarEmpurrado;
+
+      liveTelemetry = dados;
+      pendingTelemetry = dados;
+      if (anyRise) {
+        const cur = pendingLatchDelta ?? { se: 0, sce: 0, scd: 0, sd: 0 };
+        pendingLatchDelta = {
+          se: cur.se + (seRise ? 1 : 0),
+          sce: cur.sce + (sceRise ? 1 : 0),
+          scd: cur.scd + (scdRise ? 1 : 0),
+          sd: cur.sd + (sdRise ? 1 : 0),
+        };
+      }
+
+      notifyLiveListeners();
+      scheduleUiFlush(discreteChanged);
       return;
     }
     const info = parseInfoLine(line);
     if (info) {
-      set({ info });
+      const prev = liveInfo;
+      const discreteChanged =
+        prev.estrategia !== info.estrategia ||
+        prev.matchState !== info.matchState ||
+        prev.imuOnline !== info.imuOnline ||
+        prev.linhaLimiarDir !== info.linhaLimiarDir ||
+        prev.linhaLimiarEsq !== info.linhaLimiarEsq ||
+        prev.irStartDelayMs !== info.irStartDelayMs ||
+        prev.firmwareBranch !== info.firmwareBranch;
+
+      liveInfo = info;
+      pendingInfo = info;
       transport?.setRobotReadyHint(info.matchState === 1 || info.matchState === 2);
+      notifyLiveListeners();
+      scheduleUiFlush(discreteChanged);
       return;
     }
     appendLog('rx', line);
@@ -277,18 +405,20 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
   const startPolling = () => {
     stopPolling();
+    if (!liveAppActive) return;
     pollTick = 0;
     pollTimer = setInterval(() => {
+      if (!liveAppActive) return;
       const state = get();
       if (state.phase !== 'connected') return;
       pollTick += 1;
       if (state.isSimulation) {
-        const t = state.telemetry;
+        const t = liveTelemetry;
         const simVbat = Number((7.95 + Math.sin(pollTick / 5) * 0.12).toFixed(2));
         const activeCenter = pollTick % 6 < 3 ? 1 : 0;
         const raw = `${t.velocreta}|${t.velocgiro}|${t.HBEvasao ? 1 : 0}|${t.limiarParado}|${t.limiarEmpurrado}|${simVbat}|0|${activeCenter}|${activeCenter}|0|${1980 + (pollTick % 40)}|${2020 - (pollTick % 35)}`;
         handleIncomingLine(raw);
-        const inf = state.info;
+        const inf = liveInfo;
         const simPitch = Number((Math.sin(pollTick / 5) * 14.0).toFixed(1));
         const simRoll = Number((Math.cos(pollTick / 6) * 7.5).toFixed(1));
         const simAz = Number((9.81 * Math.cos((simPitch * Math.PI) / 180)).toFixed(2));
@@ -297,16 +427,20 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         );
         return;
       }
-      // When high-rate firmware STREAM,1* is active, ESP32 pushes ~16 Hz INFO + ~8 Hz dados
+      // When firmware STREAM,1* is active, ESP32 pushes interleaved frames on its own
       if (state.stream3dActive) {
         return;
       }
-      void transport?.sendCommand(cmdRequestTelemetry());
-      void transport?.sendCommand(cmdRequestInfo());
-    }, 320);
+      // Alternate single non-overlapping coalescable writes (~2 Hz each, zero GATT contention)
+      if (pollTick % 2 === 0) {
+        void transport?.sendCommand(cmdRequestTelemetry(), { coalescable: true });
+      } else {
+        void transport?.sendCommand(cmdRequestInfo(), { coalescable: true });
+      }
+    }, 260);
   };
 
-  const sendCmd = async (cmd: string) => {
+  const sendCmd = async (cmd: string, opts?: { urgent?: boolean }) => {
     const state = get();
     appendLog('tx', cmd);
 
@@ -315,30 +449,48 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       const [key, val] = clean.split(',');
       if (key === 'EST' && val) {
         const id = Number.parseInt(val, 10) as StrategyId;
+        liveInfo = { ...liveInfo, estrategia: id };
         set((s) => ({ info: { ...s.info, estrategia: id } }));
       } else if (key === 'VR' && val) {
-        set((s) => ({ telemetry: { ...s.telemetry, velocreta: Number.parseInt(val, 10) } }));
+        const n = Number.parseInt(val, 10);
+        liveTelemetry = { ...liveTelemetry, velocreta: n };
+        set((s) => ({ telemetry: { ...s.telemetry, velocreta: n } }));
       } else if (key === 'VG' && val) {
-        set((s) => ({ telemetry: { ...s.telemetry, velocgiro: Number.parseInt(val, 10) } }));
+        const n = Number.parseInt(val, 10);
+        liveTelemetry = { ...liveTelemetry, velocgiro: n };
+        set((s) => ({ telemetry: { ...s.telemetry, velocgiro: n } }));
       } else if (key === 'HBE' && val) {
-        set((s) => ({ telemetry: { ...s.telemetry, HBEvasao: val === '1' } }));
+        const b = val === '1';
+        liveTelemetry = { ...liveTelemetry, HBEvasao: b };
+        set((s) => ({ telemetry: { ...s.telemetry, HBEvasao: b } }));
       } else if (key === 'LIP' && val) {
-        set((s) => ({ telemetry: { ...s.telemetry, limiarParado: Number.parseFloat(val) } }));
+        const f = Number.parseFloat(val);
+        liveTelemetry = { ...liveTelemetry, limiarParado: f };
+        set((s) => ({ telemetry: { ...s.telemetry, limiarParado: f } }));
       } else if (key === 'LIE' && val) {
-        set((s) => ({ telemetry: { ...s.telemetry, limiarEmpurrado: Number.parseFloat(val) } }));
+        const f = Number.parseFloat(val);
+        liveTelemetry = { ...liveTelemetry, limiarEmpurrado: f };
+        set((s) => ({ telemetry: { ...s.telemetry, limiarEmpurrado: f } }));
       } else if (key === 'IRD' && val) {
-        set((s) => ({ info: { ...s.info, irStartDelayMs: Number.parseInt(val, 10) } }));
+        const n = Number.parseInt(val, 10);
+        liveInfo = { ...liveInfo, irStartDelayMs: n };
+        set((s) => ({ info: { ...s.info, irStartDelayMs: n } }));
       } else if (key === 'CAL') {
+        liveInfo = { ...liveInfo, linhaLimiarDir: 580, linhaLimiarEsq: 590 };
         set((s) => ({ info: { ...s.info, linhaLimiarDir: 580, linhaLimiarEsq: 590 } }));
         appendLog('rx', 'SIM: Calibração de linha + IMU concluída');
       } else if (key === 'IMU_CAL' || key === 'ZERO_YAW') {
+        liveInfo = { ...liveInfo, headingDeg: 0, gz: 0 };
         set((s) => ({ info: { ...s.info, headingDeg: 0, gz: 0 } }));
         appendLog('rx', key === 'ZERO_YAW' ? 'SIM: Yaw zerado (0.0°)' : 'SIM: IMU calibrada');
       } else if (key === 'MOT_E' || key === 'MOT_D') {
         appendLog('rx', `SIM: Motor ${key === 'MOT_E' ? 'Esquerdo' : 'Direito'} dir=${val ?? '0'}`);
       } else if (key === 'RESET_CFG') {
-        set({ telemetry: { ...DEFAULT_TELEMETRY, Vbat: 8.05 }, info: { ...DEFAULT_INFO, imuOnline: true, firmwareBranch: 'exper' } });
+        liveTelemetry = { ...DEFAULT_TELEMETRY, Vbat: 8.05 };
+        liveInfo = { ...DEFAULT_INFO, imuOnline: true, firmwareBranch: 'exper' };
+        set({ telemetry: liveTelemetry, info: liveInfo });
       }
+      notifyLiveListeners();
       return;
     }
 
@@ -346,7 +498,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       appendLog('sys', `Sem conexão BLE para enviar ${cmd}`);
       return;
     }
-    const ok = await transport.sendCommand(cmd);
+    const ok = await transport.sendCommand(cmd, { urgent: opts?.urgent });
     if (!ok) {
       appendLog('sys', `Falha no envio BLE: ${cmd}`);
     }
@@ -395,19 +547,24 @@ export const useSumoStore = create<SumoStore>((set, get) => {
           });
         },
         onConnected: (dev) => {
+          liveConnected = true;
           void setItem(STORAGE_KEYS.lastDeviceId, dev.id);
           set({ connectedDevice: dev, lastDeviceId: dev.id });
           appendLog('sys', `Conectado a ${dev.name} (${dev.id})`);
           void transport?.sendCommand(cmdRequestInfo());
           void transport?.sendCommand(cmdRequestTelemetry());
-          if (get().stream3dActive) {
+          if (liveAppActive && get().stream3dActive) {
             void transport?.sendCommand(cmdStreamTelemetry(true));
           }
+          notifyLiveListeners();
           startPolling();
         },
         onDisconnected: (wasCombat) => {
+          liveConnected = false;
           stopPolling();
+          clearUiFlushTimer();
           set({ connectedDevice: null });
+          notifyLiveListeners();
           appendLog(
             'sys',
             wasCombat
@@ -417,6 +574,32 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         },
         onLineReceived: handleIncomingLine,
       });
+
+      if (!appStateSub && typeof AppState?.addEventListener === 'function') {
+        liveAppActive = AppState.currentState === 'active';
+        appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+          const active = nextState === 'active';
+          if (active === liveAppActive) return;
+          liveAppActive = active;
+          const st = get();
+          if (!active) {
+            stopPolling();
+            clearUiFlushTimer();
+            if (!st.isSimulation && st.phase === 'connected' && st.stream3dActive && transport) {
+              void transport.sendCommand(cmdStreamTelemetry(false));
+            }
+          } else {
+            flushUiUpdates();
+            if (st.phase === 'connected') {
+              if (!st.isSimulation && st.stream3dActive && transport) {
+                void transport.sendCommand(cmdStreamTelemetry(true));
+              }
+              startPolling();
+            }
+          }
+          notifyLiveListeners();
+        });
+      }
 
       const s = get();
       transport.setAutoConnectConfig({
@@ -435,11 +618,13 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     startAutoConnect: async () => {
       if (get().isSimulation) {
+        liveConnected = true;
         set({
           phase: 'connected',
           statusDetail: 'Modo Simulador ativo',
           connectedDevice: { id: 'SIM-BLE-NUS', name: `${DEFAULT_DEVICE_NAME} (Sim)`, rssi: -48 },
         });
+        notifyLiveListeners();
         startPolling();
         return;
       }
@@ -454,8 +639,11 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     disconnect: async () => {
       stopPolling();
+      clearUiFlushTimer();
+      liveConnected = false;
       if (get().isSimulation) {
         set({ phase: 'disconnected', statusDetail: 'Simulador pausado', connectedDevice: null });
+        notifyLiveListeners();
         return;
       }
       await transport?.disconnect();
@@ -485,23 +673,29 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     toggleSimulation: (enabled) => {
       stopPolling();
+      clearUiFlushTimer();
       if (enabled) {
         void transport?.disconnect();
+        liveConnected = true;
+        liveInfo = { ...liveInfo, imuOnline: true, firmwareBranch: 'exper' };
         set({
           isSimulation: true,
           phase: 'connected',
           statusDetail: 'Simulador BLE local ativo (sem robô físico)',
           connectedDevice: { id: 'SIM-BLE-NUS', name: `${DEFAULT_DEVICE_NAME} (Sim)`, rssi: -45 },
-          info: { ...get().info, imuOnline: true, firmwareBranch: 'exper' },
+          info: liveInfo,
         });
+        notifyLiveListeners();
         startPolling();
       } else {
+        liveConnected = false;
         set({
           isSimulation: false,
           phase: 'disconnected',
           statusDetail: 'Pronto para buscar robô via BLE',
           connectedDevice: null,
         });
+        notifyLiveListeners();
         if (get().autoConnect) {
           get().initTransport();
           void transport?.startAutoScan();
@@ -541,7 +735,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     emergencyStop: async () => {
       clearMotorPulseTimer();
       set({ activePulseMotor: null });
-      await sendCmd(cmdEmergencyStop());
+      await sendCmd(cmdEmergencyStop(), { urgent: true });
       await sendCmd(cmdRequestInfo());
     },
 
@@ -558,9 +752,11 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     },
 
     setStream3d: async (enabled) => {
+      const prev = get().stream3dActive;
+      if (prev === enabled) return;
       set({ stream3dActive: enabled });
       const s = get();
-      if (!s.isSimulation && s.phase === 'connected' && transport) {
+      if (!s.isSimulation && s.phase === 'connected' && transport && (liveAppActive || !enabled)) {
         await transport.sendCommand(cmdStreamTelemetry(enabled));
       }
     },

@@ -644,8 +644,28 @@ export function buildSumo3DHtml(): string {
       state.yawOffsetRad = 0;
       updateTargetQuat();
       updateConesAndHud();
+    } else if (cmd === 'pause') {
+      setPaused(arg === '1' || arg === 'true');
     }
   };
+
+  var isPaused = false;
+  var rafId = 0;
+  var animClock = null;
+
+  function setPaused(p) {
+    if (isPaused === p) return;
+    isPaused = p;
+    if (isPaused) {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+    } else if (renderer && !rafId) {
+      if (animClock) animClock.getDelta();
+      rafId = requestAnimationFrame(tick);
+    }
+  }
 
   function resize() {
     var host = document.getElementById('gl-host');
@@ -656,9 +676,31 @@ export function buildSumo3DHtml(): string {
     if (camera && renderer) {
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setSize(w, h, false);
     }
+  }
+
+  function tick() {
+    if (isPaused) {
+      rafId = 0;
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+    var dt = Math.min(animClock.getDelta(), 0.05);
+    qCurrent.slerp(qTarget, Math.min(1, dt * 13));
+    imuGroup.quaternion.copy(qCurrent);
+
+    if (state.cameraLerp) {
+      state.cameraLerp.t = Math.min(1, state.cameraLerp.t + dt * 4.0);
+      var ease = 1 - Math.pow(1 - state.cameraLerp.t, 3);
+      camera.position.lerpVectors(state.cameraLerp.sp, state.cameraLerp.ep, ease);
+      controls.target.lerpVectors(state.cameraLerp.st, state.cameraLerp.et, ease);
+      if (state.cameraLerp.t >= 1) state.cameraLerp = null;
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
   }
 
   function init() {
@@ -698,25 +740,10 @@ export function buildSumo3DHtml(): string {
     resize();
     window.addEventListener('resize', resize);
 
-    var clock = new T.Clock();
-    function tick() {
-      requestAnimationFrame(tick);
-      var dt = Math.min(clock.getDelta(), 0.05);
-      qCurrent.slerp(qTarget, Math.min(1, dt * 13));
-      imuGroup.quaternion.copy(qCurrent);
-
-      if (state.cameraLerp) {
-        state.cameraLerp.t = Math.min(1, state.cameraLerp.t + dt * 4.0);
-        var ease = 1 - Math.pow(1 - state.cameraLerp.t, 3);
-        camera.position.lerpVectors(state.cameraLerp.sp, state.cameraLerp.ep, ease);
-        controls.target.lerpVectors(state.cameraLerp.st, state.cameraLerp.et, ease);
-        if (state.cameraLerp.t >= 1) state.cameraLerp = null;
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
+    animClock = new T.Clock();
+    if (!isPaused) {
+      rafId = requestAnimationFrame(tick);
     }
-    tick();
   }
 
   init();
