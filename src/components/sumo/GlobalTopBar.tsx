@@ -8,12 +8,14 @@ import {
   X,
 } from 'lucide-react-native';
 import * as React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, Vibration, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ConnectionPhase } from '@/lib/sumo/ble-transport';
 import { lipo2sStatus } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
+
+const DRAGONBOTZ_LOGO = require('../../../assets/dragonbotz-logo.png');
 
 function statusMeta(phase: ConnectionPhase): { dot: string; label: string } {
   switch (phase) {
@@ -270,6 +272,11 @@ export function GlobalTopBar() {
                 </ScrollView>
               </>
             ) : null}
+
+            <View style={styles.brandSheetFooter}>
+              <Image source={DRAGONBOTZ_LOGO} style={styles.brandSheetLogo} resizeMode="contain" />
+              <Text style={styles.brandSheetSub}>SUMO_AUTO_ESP32 · BLE NUS</Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -494,5 +501,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
+  },
+  brandSheetFooter: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    gap: 4,
+  },
+  brandSheetLogo: {
+    width: 112,
+    height: 32,
+    opacity: 0.9,
+  },
+  brandSheetSub: {
+    color: '#71717A',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    fontFamily: 'monospace',
   },
 });

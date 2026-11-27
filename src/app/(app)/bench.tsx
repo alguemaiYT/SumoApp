@@ -1,12 +1,7 @@
 import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
   Compass,
   Send,
   Share2,
-  Square,
   Target,
   Trash2,
 } from 'lucide-react-native';
@@ -24,6 +19,7 @@ import {
   View,
 } from 'react-native';
 
+import { ManualDrivePad } from '@/components/sumo/ManualDrivePad';
 import { lipo2sStatus } from '@/lib/sumo/protocol';
 import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
@@ -203,13 +199,9 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const logs = useSumoStore((s) => s.logs);
   const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
-  const activePulseMotor = useSumoStore((s) => s.activePulseMotor);
 
-  const emergencyStop = useSumoStore((s) => s.emergencyStop);
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
-  const benchJog = useSumoStore((s) => s.benchJog);
-  const benchMotorPulse = useSumoStore((s) => s.benchMotorPulse);
   const sendRaw = useSumoStore((s) => s.sendRaw);
   const clearLogs = useSumoStore((s) => s.clearLogs);
   const updateMeasurement = useSumoStore((s) => s.updateMeasurement);
@@ -333,116 +325,8 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
             </View>
           </View>
 
-          {/* Ergonomic Thumb-Zone D-Pad (auto-hides while keyboard is open) */}
-          {!cmdFocused ? (
-            <View style={styles.dpadPane}>
-              <Text style={styles.safetyNote}>
-                Rodas suspensas · segure para acionar · soltar envia parada
-              </Text>
-
-              <View style={styles.dpadGrid}>
-                <View style={styles.dpadRow}>
-                  <Pressable
-                    onPressIn={() => {
-                      Vibration.vibrate(20);
-                      void benchJog('FRENTE');
-                    }}
-                    onPressOut={() => void emergencyStop()}
-                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                  >
-                    <ArrowUp color="#FAFAFA" size={26} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.dpadRow}>
-                  <Pressable
-                    onPressIn={() => {
-                      Vibration.vibrate(20);
-                      void benchJog('ESQ');
-                    }}
-                    onPressOut={() => void emergencyStop()}
-                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                  >
-                    <ArrowLeft color="#FAFAFA" size={26} />
-                  </Pressable>
-
-                  {/* Softened graphite stop key with subtle red border (global STOP owns red fill) */}
-                  <Pressable
-                    onPress={() => {
-                      Vibration.vibrate(90);
-                      void emergencyStop();
-                    }}
-                    style={styles.dpadStop}
-                  >
-                    <Square color="#EF4444" size={18} fill="#EF4444" />
-                  </Pressable>
-
-                  <Pressable
-                    onPressIn={() => {
-                      Vibration.vibrate(20);
-                      void benchJog('DIR');
-                    }}
-                    onPressOut={() => void emergencyStop()}
-                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                  >
-                    <ArrowRight color="#FAFAFA" size={26} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.dpadRow}>
-                  <Pressable
-                    onPressIn={() => {
-                      Vibration.vibrate(20);
-                      void benchJog('RE');
-                    }}
-                    onPressOut={() => void emergencyStop()}
-                    style={[styles.dpadKey, { backgroundColor: surface, borderColor: divider }]}
-                  >
-                    <ArrowDown color="#FAFAFA" size={26} />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Isolated Single-Motor Safe 1s Pulse Strip */}
-              <View style={styles.motorPulseStrip}>
-                <Text style={styles.motorPulseLabel}>PULSO 1S</Text>
-                {(
-                  [
-                    { side: 'E' as const, dir: 1 as const, label: 'Esq +' },
-                    { side: 'E' as const, dir: -1 as const, label: 'Esq -' },
-                    { side: 'D' as const, dir: 1 as const, label: 'Dir +' },
-                    { side: 'D' as const, dir: -1 as const, label: 'Dir -' },
-                  ] as const
-                ).map((btn) => {
-                  const tag = `${btn.side}:${btn.dir}`;
-                  const active = activePulseMotor === tag;
-                  return (
-                    <Pressable
-                      key={tag}
-                      onPress={() => {
-                        Vibration.vibrate(25);
-                        void benchMotorPulse(btn.side, btn.dir, 1000);
-                      }}
-                      style={[
-                        styles.motorPulseBtn,
-                        { backgroundColor: surface, borderColor: divider },
-                        active && styles.motorPulseBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.motorPulseBtnText,
-                          active && { color: '#FAFAFA' },
-                        ]}
-                      >
-                        {btn.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
+          {/* Dynamic 360° Joystick / D-Pad + Speed Selector + 1s Motor Pulse (auto-hides on keyboard) */}
+          {!cmdFocused ? <ManualDrivePad surface={surface} divider={divider} /> : null}
         </View>
       ) : null}
 
@@ -720,7 +604,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
-    minHeight: 190,
+    minHeight: 148,
   },
   consoleHeader: {
     flexDirection: 'row',

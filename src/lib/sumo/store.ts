@@ -187,6 +187,8 @@ interface SumoStore {
   resetRobotConfig: () => Promise<void>;
   benchJog: (dir: BenchJogDirection) => Promise<void>;
   benchMotorPulse: (side: BenchMotorSide, dir: BenchMotorDir, durationMs?: number) => Promise<void>;
+  setBenchSpeed: (vr: number, vg: number) => Promise<void>;
+  sendDriveCommand: (cmd: string) => Promise<void>;
   clearLogs: () => void;
 
   // Measurements persistence
@@ -780,8 +782,29 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       motorPulseTimer = setTimeout(() => {
         motorPulseTimer = null;
         set({ activePulseMotor: null });
-        void sendCmd(cmdEmergencyStop());
+        void sendCmd(cmdEmergencyStop(), { urgent: true });
       }, durationMs);
+    },
+
+    setBenchSpeed: async (vr, vg) => {
+      await sendCmd(cmdStraightSpeed(vr));
+      await sendCmd(cmdTurnSpeed(vg));
+      await sendCmd(cmdRequestTelemetry());
+    },
+
+    sendDriveCommand: async (cmd) => {
+      clearMotorPulseTimer();
+      if (get().activePulseMotor !== null) {
+        set({ activePulseMotor: null });
+      }
+      const state = get();
+      if (state.isSimulation) {
+        return;
+      }
+      if (!transport || state.phase !== 'connected') {
+        return;
+      }
+      await transport.sendCommand(cmd, { urgent: cmd === 'PARADA*' });
     },
 
     clearLogs: () => set({ logs: [] }),

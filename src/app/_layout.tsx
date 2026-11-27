@@ -8,6 +8,7 @@ import FlashMessage from 'react-native-flash-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DragonBotzSplash } from '@/components/sumo/DragonBotzSplash';
 import { useSumoStore } from '@/lib/sumo/store';
 import '../global.css';
 
@@ -63,6 +64,7 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(app)" />
           </Stack>
+          <DragonBotzSplash />
           <FlashMessage position="top" />
         </ThemeProvider>
       </SafeAreaProvider>

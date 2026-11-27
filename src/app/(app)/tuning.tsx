@@ -2,7 +2,6 @@ import { RotateCcw, Save } from 'lucide-react-native';
 import * as React from 'react';
 import {
   Alert,
-  type GestureResponderEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { DynamicSlider } from '@/components/sumo/DynamicSlider';
 import { TOURNAMENT_PRESETS, type TournamentPreset } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
 
@@ -43,28 +43,12 @@ function ParamRow({
   fillFromRight?: boolean;
   dividerColor: string;
 }) {
-  const [trackWidth, setTrackWidth] = React.useState(200);
-
-  const clampAndSnap = (n: number) => {
-    const snapped = Math.round(n / step) * step;
-    const c = Math.max(min, Math.min(max, snapped));
-    return decimals > 0 ? Number(c.toFixed(decimals)) : Math.round(c);
-  };
-
   const clampExact = (n: number) => {
     const c = Math.max(min, Math.min(max, n));
     return decimals > 0 ? Number(c.toFixed(decimals)) : Math.round(c);
   };
 
-  const handleTrackPress = (e: GestureResponderEvent) => {
-    if (trackWidth <= 0) return;
-    const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackWidth));
-    const raw = min + ratio * (max - min);
-    onChange(clampAndSnap(raw));
-  };
-
   const dirty = Math.abs(value - savedValue) > (decimals > 0 ? 0.001 : 0);
-  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   const stepLabel = decimals > 0 ? `±${step.toFixed(decimals)}` : `±${step}`;
   const accentCol = dirty ? '#FF4D00' : '#FAFAFA';
 
@@ -107,43 +91,16 @@ function ParamRow({
         </Pressable>
 
         <View style={styles.barWrap}>
-          <Pressable
-            onPress={handleTrackPress}
-            onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-            style={styles.sliderHit}
-          >
-            <View style={styles.barTrack}>
-              {fillFromRight ? (
-                <View
-                  style={[
-                    styles.barFillRight,
-                    {
-                      left: `${pct}%`,
-                      right: 0,
-                      backgroundColor: accentCol,
-                    },
-                  ]}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.barFill,
-                    { width: `${pct}%`, backgroundColor: accentCol },
-                  ]}
-                />
-              )}
-            </View>
-            {/* Geometric Mixer Thumb (4x16px) */}
-            <View
-              style={[
-                styles.thumb,
-                {
-                  left: `${pct}%`,
-                  backgroundColor: accentCol,
-                },
-              ]}
-            />
-          </Pressable>
+          <DynamicSlider
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            decimals={decimals}
+            fillFromRight={fillFromRight}
+            accentColor={accentCol}
+            onChange={onChange}
+          />
 
           <View style={styles.barTicks}>
             <Text style={styles.tickText}>{decimals > 0 ? min.toFixed(decimals) : min}</Text>

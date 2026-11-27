@@ -1,12 +1,14 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight, RotateCcw } from 'lucide-react-native';
 import * as React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { Robot3DViewport } from '@/components/sumo/Robot3DViewport';
 import { RobotRadarSvg } from '@/components/sumo/RobotRadarSvg';
 import { STRATEGIES } from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
+
+const DRAGONBOTZ_LOGO = require('../../../assets/dragonbotz-logo.png');
 
 const SHORT_MATCH_STATE: Record<number, string> = {
   0: 'IDLE',
@@ -250,6 +252,12 @@ export default function DashboardScreen() {
           LIP {telemetry.limiarParado.toFixed(2)} · LIE {telemetry.limiarEmpurrado.toFixed(2)}
         </Text>
       </View>
+
+      {/* Minimalist DragonBotz Brand Signature */}
+      <View style={[styles.brandFooter, { borderTopColor: divider }]}>
+        <Image source={DRAGONBOTZ_LOGO} style={styles.brandLogo} resizeMode="contain" />
+        <Text style={styles.brandTag}>MADINBOO · 500G</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -486,5 +494,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'monospace',
     fontVariant: ['tabular-nums'],
+  },
+  brandFooter: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    opacity: 0.82,
+  },
+  brandLogo: {
+    width: 96,
+    height: 28,
+  },
+  brandTag: {
+    color: '#71717A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    fontFamily: 'monospace',
   },
 });

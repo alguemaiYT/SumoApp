@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Modal, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
+import { acquireTabSwipeLock, releaseTabSwipeLock } from '@/lib/sumo/gesture-lock';
 import {
   getLiveTelemetrySnapshot,
   type LiveTelemetrySnapshot,
@@ -72,6 +73,23 @@ export const Robot3DViewport = React.memo(function Robot3DViewport({
   const lastPayloadRef = React.useRef('');
   const lastPausedRef = React.useRef<boolean | null>(null);
   const pendingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchLockedRef = React.useRef(false);
+
+  const lockSwipeFor3D = React.useCallback(() => {
+    if (!touchLockedRef.current) {
+      touchLockedRef.current = true;
+      acquireTabSwipeLock();
+    }
+  }, []);
+
+  const unlockSwipeFor3D = React.useCallback(() => {
+    if (touchLockedRef.current) {
+      touchLockedRef.current = false;
+      releaseTabSwipeLock();
+    }
+  }, []);
+
+  React.useEffect(() => unlockSwipeFor3D, [unlockSwipeFor3D]);
 
   const [fullscreen, setFullscreen] = React.useState(false);
   const [cam, setCam] = React.useState<CamPreset>('iso');
@@ -287,7 +305,12 @@ export const Robot3DViewport = React.memo(function Robot3DViewport({
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.viewportBox, { height, borderColor: borderCol }]}>
+      <View
+        style={[styles.viewportBox, { height, borderColor: borderCol }]}
+        onTouchStart={lockSwipeFor3D}
+        onTouchEnd={unlockSwipeFor3D}
+        onTouchCancel={unlockSwipeFor3D}
+      >
         {!fullscreen ? (
           <WebView
             ref={webRef}
