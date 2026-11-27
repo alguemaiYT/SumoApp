@@ -626,7 +626,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         `- Alcance IR: Alvo claro=${m.irRangeWhiteCm || '?'} cm | Stealth preto=${m.irRangeStealthCm || '?'} cm`,
         `- Linha ADC Preto: LD=${m.adcBlackLd || '?'} / LE=${m.adcBlackLe || '?'}`,
         `- Linha ADC Branco: LD=${m.adcWhiteLd || '?'} / LE=${m.adcWhiteLe || '?'}`,
-        `- GPIO 27 (ADC2) notas: ${m.adc2GlitchNotes || '—'}`,
+        `- GPIO 26 (ADC2) notas: ${m.adc2GlitchNotes || '—'}`,
         `- Reta 50 cm: ${m.sprint50cmSec || '?'} s | Parada na borda: ${m.edgeStopDistCm || '?'} cm`,
         `- Força atrito estático: ${m.muStaticForceN || '?'} N | Stall PWM 255: ${m.stallForceN || '?'} N`,
         `- Observações: ${m.notes || '—'}`,

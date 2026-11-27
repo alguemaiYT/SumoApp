@@ -23,7 +23,7 @@ O firmware `Sumo_Auto_ESP32` utiliza **Bluetooth Low Energy (BLE)** nativo do ES
 3. **Ajustes & Perfis:** 4 perfis rápidos de competição, sliders com pegador geométrico (`LIE` negativo preenchido da direita para o zero), barra fixa `Salvar na EEPROM` com estado *dirty* e `Resetar` (`RESET_CFG*`).
 4. **Bancada (Controle, Calibração & Ficha Técnica):**
    - **Controle:** console BLE NUS cronológico (`TX` ciano, `RX` verde), chips rápidos (`INFO*`, `dados*`, `ZERO_YAW*`, `CAL*`, `PARADA*`), D-Pad de bancada (soltou = `PARADA*`) e faixa **`PULSO 1S`** isolada por motor (`Esq +`/`-`, `Dir +`/`-` via `MOT_E`/`MOT_D`).
-   - **Calibração:** `CAL*`, `IMU_CAL*` (salva biases na NVS da ESP32), **Diagnóstico de Pinos IR (Latch)** com GPIO (`SE·32`, `SCE·33`, `SCD·25`, `SD·26`) + contadores, saúde `LiPo 2S` e inclinação em graus.
+   - **Calibração:** `CAL*`, `IMU_CAL*` (salva biases na NVS da ESP32), **Diagnóstico de Pinos IR (Latch)** com GPIO (`SE·35`, `SCE·32`, `SCD·33`, `SD·25`) + contadores, linhas (`LE·39`, `LD·26`), saúde `LiPo 2S` e inclinação em graus.
    - **Ficha Técnica:** preenchimento 1-toque via BLE (`+ Vbat`, `+ Preto`, `+ Branco`), persistência local (MMKV) e exportação em Markdown.
 
 ## Conformidade com Regras de Competição (IR)

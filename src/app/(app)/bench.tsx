@@ -399,10 +399,10 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
           <View style={[styles.pinDiagGrid, { borderColor: divider, backgroundColor: surface }]}>
             {(
               [
-                { name: 'SE', gpio: '32', val: telemetry.sen_esq, count: sensorLatch.se },
-                { name: 'SCE', gpio: '33', val: telemetry.sen_centro_esq, count: sensorLatch.sce },
-                { name: 'SCD', gpio: '25', val: telemetry.sen_centro_dir, count: sensorLatch.scd },
-                { name: 'SD', gpio: '26', val: telemetry.sen_dir, count: sensorLatch.sd },
+                { name: 'SE', gpio: '35', val: telemetry.sen_esq, count: sensorLatch.se },
+                { name: 'SCE', gpio: '32', val: telemetry.sen_centro_esq, count: sensorLatch.sce },
+                { name: 'SCD', gpio: '33', val: telemetry.sen_centro_dir, count: sensorLatch.scd },
+                { name: 'SD', gpio: '25', val: telemetry.sen_dir, count: sensorLatch.sd },
               ] as const
             ).map((pin, idx) => {
               const on = pin.val === 1;
@@ -453,13 +453,13 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
                 warn: false,
               },
               {
-                k: 'Linha Esq (LE · 35)',
+                k: 'Linha Esq (LE · 39)',
                 cur: `${telemetry.sensorLE}`,
                 ref: `limiar ≤ ${info.linhaLimiarEsq}`,
                 warn: false,
               },
               {
-                k: 'Linha Dir (LD · 27)',
+                k: 'Linha Dir (LD · 26)',
                 cur: `${telemetry.sensorLD}`,
                 ref: `limiar ≤ ${info.linhaLimiarDir}`,
                 warn: false,
