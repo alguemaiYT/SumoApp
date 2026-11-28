@@ -4,11 +4,16 @@ import {
   BLE_NUS_TX_UUID,
   cmdBenchJog,
   cmdBenchMotor,
+  cmdBenchSpeed,
   cmdCalibrateAll,
+  cmdCalibrateBlack,
   cmdCalibrateImu,
+  cmdCalibrateWhite,
   cmdEmergencyStop,
   cmdHbevasao,
   cmdIrStartDelay,
+  cmdLineCalTest,
+  cmdLineThresholds,
   cmdPushedThreshold,
   cmdRequestInfo,
   cmdRequestTelemetry,
@@ -19,10 +24,12 @@ import {
   cmdStreamTelemetry,
   cmdTurnSpeed,
   cmdZeroYaw,
+  isLineEdgeDetected,
   LineAccumulator,
   lipo2sStatus,
   parseDadosLine,
   parseInfoLine,
+  parseLineCalEvent,
   STRATEGIES,
 } from '../protocol';
 import { decodeBase64ToUtf8, encodeUtf8ToBase64 } from '../base64';
@@ -57,6 +64,13 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdRequestTelemetry()).toBe('dados*');
     expect(cmdRequestInfo()).toBe('INFO*');
     expect(cmdCalibrateAll()).toBe('CAL*');
+    expect(cmdCalibrateBlack()).toBe('CAL_PRETO*');
+    expect(cmdCalibrateWhite()).toBe('CAL_BRANCO*');
+    expect(cmdLineCalTest(true)).toBe('CAL_TEST,1*');
+    expect(cmdLineCalTest(false)).toBe('CAL_TEST,0*');
+    expect(cmdLineThresholds(1550, 1620)).toBe('LINHA_THR,1550,1620*');
+    expect(cmdLineThresholds(1550, 1620, false)).toBe('LINHA_THR,1550,1620,0*');
+    expect(cmdBenchSpeed(120)).toBe('BVEL,120*');
     expect(cmdCalibrateImu()).toBe('IMU_CAL*');
     expect(cmdZeroYaw()).toBe('ZERO_YAW*');
     expect(cmdStreamTelemetry(true)).toBe('STREAM,1*');
@@ -105,9 +119,9 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(parseDadosLine('')).toBeNull();
   });
 
-  test('parses extended INFO* telemetry line with az, pitch/roll and legacy fallback', () => {
+  test('parses extended INFO* telemetry line with az, pitch/roll, line cal, NVS and legacy fallback', () => {
     const info = parseInfoLine(
-      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|az=9.78|gz=12.4|hdg=91.5|pitch=35.4|roll=-2.1|ldThr=410|leThr=420|ird=5000|fw=exper',
+      'INFO|est=6|state=1|imu=1|ax=0.12|ay=-0.05|az=9.78|gz=12.4|hdg=91.5|pitch=35.4|roll=-2.1|ldThr=1560|leThr=1620|ird=5000|fw=exper|wLow=0|lCal=3|nvs=1',
       2000,
     );
     expect(info).toEqual({
@@ -121,14 +135,44 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
       headingDeg: 91.5,
       pitchDeg: 35.4,
       rollDeg: -2.1,
-      linhaLimiarDir: 410,
-      linhaLimiarEsq: 420,
+      linhaLimiarDir: 1560,
+      linhaLimiarEsq: 1620,
+      lineWhiteIsLow: false,
+      lineCalFlags: 3,
+      nvsOk: true,
       irStartDelayMs: 5000,
       firmwareBranch: 'exper',
       timestamp: 2000,
     });
 
-    // Legacy firmware without az/pitch/roll estimates from ax/ay and defaults az=9.81
+    // Edge polarity helper handles both normal (white < black) and inverted (white > black)
+    expect(isLineEdgeDetected(300, 1560, true)).toBe(true);
+    expect(isLineEdgeDetected(3100, 1560, true)).toBe(false);
+    expect(isLineEdgeDetected(3100, 1560, false)).toBe(true);
+    expect(isLineEdgeDetected(300, 1560, false)).toBe(false);
+
+    // Parses CAL_PRETO and CAL_BRANCO structured replies
+    expect(
+      parseLineCalEvent(
+        'CAL_BRANCO|ok=1|ld=300|le=340|cDir=2800|cEsq=2910|ldThr=1560|leThr=1649|wLow=1|cal=3|nvs=1',
+        2200,
+      ),
+    ).toEqual({
+      kind: 'branco',
+      ok: true,
+      ld: 300,
+      le: 340,
+      cDir: 2800,
+      cEsq: 2910,
+      ldThr: 1560,
+      leThr: 1649,
+      whiteIsLow: true,
+      calFlags: 3,
+      nvsOk: true,
+      timestamp: 2200,
+    });
+
+    // Legacy firmware without az/pitch/roll/wLow/lCal/nvs estimates safely
     const legacy = parseInfoLine(
       'INFO|est=1|state=0|imu=1|ax=4.905|ay=0.00|gz=0.0|hdg=0.0|ldThr=250|leThr=250|ird=0|fw=debug',
       2100,
@@ -136,6 +180,9 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(legacy?.az).toBe(9.81);
     expect(legacy?.pitchDeg).toBe(30);
     expect(legacy?.rollDeg).toBe(0);
+    expect(legacy?.lineWhiteIsLow).toBe(true);
+    expect(legacy?.lineCalFlags).toBe(0);
+    expect(legacy?.nvsOk).toBe(true);
   });
 
   test('computes realistic 2S LiPo health percentage and alert levels', () => {

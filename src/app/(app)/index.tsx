@@ -138,6 +138,7 @@ export default function DashboardScreen() {
             sensorLD={telemetry.sensorLD}
             thrLE={info.linhaLimiarEsq}
             thrLD={info.linhaLimiarDir}
+            whiteIsLow={info.lineWhiteIsLow}
             headingDeg={info.headingDeg}
             highContrast={highContrast}
           />

@@ -9,6 +9,7 @@ import type {
   BenchJogDirection,
   BenchMotorDir,
   BenchMotorSide,
+  LineCalEvent,
   RobotInfoData,
   StrategyId,
   TelemetryData,
@@ -17,11 +18,15 @@ import type {
 import {
   cmdBenchJog,
   cmdBenchMotor,
+  cmdBenchSpeed,
   cmdCalibrateAll,
+  cmdCalibrateBlack,
   cmdCalibrateImu,
+  cmdCalibrateWhite,
   cmdEmergencyStop,
   cmdHbevasao,
   cmdIrStartDelay,
+  cmdLineCalTest,
   cmdPushedThreshold,
   cmdRequestInfo,
   cmdRequestTelemetry,
@@ -33,8 +38,10 @@ import {
   cmdTurnSpeed,
   cmdZeroYaw,
   DEFAULT_DEVICE_NAME,
+  isLineEdgeDetected,
   parseDadosLine,
   parseInfoLine,
+  parseLineCalEvent,
 } from './protocol';
 
 export interface ConsoleEntry {
@@ -124,6 +131,9 @@ const DEFAULT_INFO: RobotInfoData = {
   rollDeg: 0,
   linhaLimiarDir: 250,
   linhaLimiarEsq: 250,
+  lineWhiteIsLow: true,
+  lineCalFlags: 0,
+  nvsOk: true,
   irStartDelayMs: 0,
   firmwareBranch: 'unknown',
   timestamp: 0,
@@ -153,6 +163,8 @@ interface SumoStore {
   discoveredDevices: DiscoveredRobot[];
   telemetry: TelemetryData;
   info: RobotInfoData;
+  lastLineCalEvent: LineCalEvent | null;
+  lineTestActive: boolean;
   logs: ConsoleEntry[];
   measurements: MeasurementRecord;
 
@@ -181,6 +193,9 @@ interface SumoStore {
   applyPreset: (preset: TournamentPreset) => Promise<void>;
   emergencyStop: () => Promise<void>;
   calibrateAll: () => Promise<void>;
+  calibrateBlack: () => Promise<void>;
+  calibrateWhite: () => Promise<void>;
+  setLineCalTest: (enabled: boolean) => Promise<void>;
   calibrateImu: () => Promise<void>;
   zeroYaw: () => Promise<void>;
   setStream3d: (enabled: boolean) => Promise<void>;
@@ -188,6 +203,7 @@ interface SumoStore {
   benchJog: (dir: BenchJogDirection) => Promise<void>;
   benchMotorPulse: (side: BenchMotorSide, dir: BenchMotorDir, durationMs?: number) => Promise<void>;
   setBenchSpeed: (vr: number, vg: number) => Promise<void>;
+  setManualBenchSpeed: (pwm: number) => Promise<void>;
   sendDriveCommand: (cmd: string) => Promise<void>;
   clearLogs: () => void;
 
@@ -349,10 +365,26 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         }
       }
 
-      const prevLeEdge = prev.sensorLE <= liveInfo.linhaLimiarEsq;
-      const prevLdEdge = prev.sensorLD <= liveInfo.linhaLimiarDir;
-      const nextLeEdge = dados.sensorLE <= liveInfo.linhaLimiarEsq;
-      const nextLdEdge = dados.sensorLD <= liveInfo.linhaLimiarDir;
+      const prevLeEdge = isLineEdgeDetected(
+        prev.sensorLE,
+        liveInfo.linhaLimiarEsq,
+        liveInfo.lineWhiteIsLow,
+      );
+      const prevLdEdge = isLineEdgeDetected(
+        prev.sensorLD,
+        liveInfo.linhaLimiarDir,
+        liveInfo.lineWhiteIsLow,
+      );
+      const nextLeEdge = isLineEdgeDetected(
+        dados.sensorLE,
+        liveInfo.linhaLimiarEsq,
+        liveInfo.lineWhiteIsLow,
+      );
+      const nextLdEdge = isLineEdgeDetected(
+        dados.sensorLD,
+        liveInfo.linhaLimiarDir,
+        liveInfo.lineWhiteIsLow,
+      );
 
       const discreteChanged =
         prev.sen_esq !== dados.sen_esq ||
@@ -392,6 +424,9 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         prev.imuOnline !== info.imuOnline ||
         prev.linhaLimiarDir !== info.linhaLimiarDir ||
         prev.linhaLimiarEsq !== info.linhaLimiarEsq ||
+        prev.lineWhiteIsLow !== info.lineWhiteIsLow ||
+        prev.lineCalFlags !== info.lineCalFlags ||
+        prev.nvsOk !== info.nvsOk ||
         prev.irStartDelayMs !== info.irStartDelayMs ||
         prev.firmwareBranch !== info.firmwareBranch;
 
@@ -400,6 +435,17 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       transport?.setRobotReadyHint(info.matchState === 1 || info.matchState === 2);
       notifyLiveListeners();
       scheduleUiFlush(discreteChanged);
+      return;
+    }
+    const calEvt = parseLineCalEvent(line);
+    if (calEvt) {
+      set({ lastLineCalEvent: calEvt });
+      appendLog('rx', line);
+      return;
+    }
+    if (line.trim().startsWith('CAL_TEST|')) {
+      set({ lineTestActive: line.includes('active=1') });
+      appendLog('rx', line);
       return;
     }
     appendLog('rx', line);
@@ -425,7 +471,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         const simRoll = Number((Math.cos(pollTick / 6) * 7.5).toFixed(1));
         const simAz = Number((9.81 * Math.cos((simPitch * Math.PI) / 180)).toFixed(2));
         handleIncomingLine(
-          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|az=${simAz}|gz=0.3|hdg=${((pollTick * 4) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper`,
+          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|az=${simAz}|gz=0.3|hdg=${((pollTick * 4) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper|wLow=${inf.lineWhiteIsLow ? 1 : 0}|lCal=${inf.lineCalFlags}|nvs=1`,
         );
         return;
       }
@@ -478,9 +524,51 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         liveInfo = { ...liveInfo, irStartDelayMs: n };
         set((s) => ({ info: { ...s.info, irStartDelayMs: n } }));
       } else if (key === 'CAL') {
-        liveInfo = { ...liveInfo, linhaLimiarDir: 580, linhaLimiarEsq: 590 };
-        set((s) => ({ info: { ...s.info, linhaLimiarDir: 580, linhaLimiarEsq: 590 } }));
+        liveInfo = { ...liveInfo, linhaLimiarDir: 580, linhaLimiarEsq: 590, lineCalFlags: 1, nvsOk: true };
+        set((s) => ({
+          info: { ...s.info, linhaLimiarDir: 580, linhaLimiarEsq: 590, lineCalFlags: 1, nvsOk: true },
+        }));
         appendLog('rx', 'SIM: Calibração de linha + IMU concluída');
+      } else if (key === 'CAL_PRETO') {
+        liveInfo = { ...liveInfo, linhaLimiarDir: 900, linhaLimiarEsq: 910, lineCalFlags: liveInfo.lineCalFlags | 1, nvsOk: true };
+        const evt: LineCalEvent = {
+          kind: 'preto',
+          ok: true,
+          ld: 2010,
+          le: 2030,
+          ldThr: 900,
+          leThr: 910,
+          whiteIsLow: true,
+          calFlags: liveInfo.lineCalFlags,
+          nvsOk: true,
+          timestamp: Date.now(),
+        };
+        set((s) => ({ info: { ...s.info, ...liveInfo }, lastLineCalEvent: evt }));
+        appendLog('rx', 'SIM: CAL_PRETO salvo na NVS');
+      } else if (key === 'CAL_BRANCO') {
+        liveInfo = { ...liveInfo, linhaLimiarDir: 1020, linhaLimiarEsq: 1035, lineWhiteIsLow: true, lineCalFlags: 3, nvsOk: true };
+        const evt: LineCalEvent = {
+          kind: 'branco',
+          ok: true,
+          ld: 180,
+          le: 195,
+          cDir: 1830,
+          cEsq: 1835,
+          ldThr: 1020,
+          leThr: 1035,
+          whiteIsLow: true,
+          calFlags: 3,
+          nvsOk: true,
+          timestamp: Date.now(),
+        };
+        set((s) => ({ info: { ...s.info, ...liveInfo }, lastLineCalEvent: evt }));
+        appendLog('rx', 'SIM: CAL_BRANCO 2 pontos salvo na NVS');
+      } else if (key === 'CAL_TEST') {
+        const active = val === '1';
+        set({ lineTestActive: active });
+        appendLog('rx', `SIM: Teste LEDs borda ${active ? 'ATIVO' : 'DESLIGADO'}`);
+      } else if (key === 'BVEL') {
+        appendLog('rx', `SIM: Velocidade manual temporária PWM=${val ?? '0'} (NVS preservada)`);
       } else if (key === 'IMU_CAL' || key === 'ZERO_YAW') {
         liveInfo = { ...liveInfo, headingDeg: 0, gz: 0 };
         set((s) => ({ info: { ...s.info, headingDeg: 0, gz: 0 } }));
@@ -526,6 +614,8 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     discoveredDevices: [],
     telemetry: DEFAULT_TELEMETRY,
     info: DEFAULT_INFO,
+    lastLineCalEvent: null,
+    lineTestActive: false,
     logs: [makeLog('sys', 'SumoApp BLE NUS inicializado')],
     measurements: { ...DEFAULT_MEASUREMENTS, ...(savedMeasurements ?? {}) },
 
@@ -565,7 +655,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
           liveConnected = false;
           stopPolling();
           clearUiFlushTimer();
-          set({ connectedDevice: null });
+          set({ connectedDevice: null, lineTestActive: false });
           notifyLiveListeners();
           appendLog(
             'sys',
@@ -736,13 +826,26 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     emergencyStop: async () => {
       clearMotorPulseTimer();
-      set({ activePulseMotor: null });
+      set({ activePulseMotor: null, lineTestActive: false });
       await sendCmd(cmdEmergencyStop(), { urgent: true });
       await sendCmd(cmdRequestInfo());
     },
 
     calibrateAll: async () => {
       await sendCmd(cmdCalibrateAll());
+    },
+
+    calibrateBlack: async () => {
+      await sendCmd(cmdCalibrateBlack());
+    },
+
+    calibrateWhite: async () => {
+      await sendCmd(cmdCalibrateWhite());
+    },
+
+    setLineCalTest: async (enabled) => {
+      set({ lineTestActive: enabled });
+      await sendCmd(cmdLineCalTest(enabled));
     },
 
     calibrateImu: async () => {
@@ -790,6 +893,10 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       await sendCmd(cmdStraightSpeed(vr));
       await sendCmd(cmdTurnSpeed(vg));
       await sendCmd(cmdRequestTelemetry());
+    },
+
+    setManualBenchSpeed: async (pwm) => {
+      await sendCmd(cmdBenchSpeed(pwm));
     },
 
     sendDriveCommand: async (cmd) => {

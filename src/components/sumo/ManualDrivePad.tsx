@@ -105,12 +105,12 @@ export const ManualDrivePad = React.memo(function ManualDrivePad({
   const benchJog = useSumoStore((s) => s.benchJog);
   const benchMotorPulse = useSumoStore((s) => s.benchMotorPulse);
   const emergencyStop = useSumoStore((s) => s.emergencyStop);
-  const setBenchSpeed = useSumoStore((s) => s.setBenchSpeed);
+  const setManualBenchSpeed = useSumoStore((s) => s.setManualBenchSpeed);
   const sendDriveCommand = useSumoStore((s) => s.sendDriveCommand);
 
   const [driveMode, setDriveMode] = React.useState<DriveMode>('joystick');
   const [speedPwm, setSpeedPwm] = React.useState<number>(savedVr || 180);
-  const [combatBackup, setCombatBackup] = React.useState<{ vr: number; vg: number } | null>(null);
+  const [benchOverrideActive, setBenchOverrideActive] = React.useState(false);
 
   const [thumb, setThumb] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [activeSector, setActiveSector] = React.useState<SectorId>('CENTER');
@@ -125,10 +125,10 @@ export const ManualDrivePad = React.memo(function ManualDrivePad({
 
   // Sync slider when robot telemetry updates externally and user hasn't overridden in bench
   React.useEffect(() => {
-    if (!combatBackup) {
+    if (!benchOverrideActive) {
       setSpeedPwm(savedVr);
     }
-  }, [combatBackup, savedVr]);
+  }, [benchOverrideActive, savedVr]);
 
   const clearPulseLoop = React.useCallback(() => {
     if (pulseTimerRef.current) {
@@ -266,22 +266,19 @@ export const ManualDrivePad = React.memo(function ManualDrivePad({
   const commitManualSpeed = React.useCallback(
     (pwm: number) => {
       const clamped = Math.max(60, Math.min(255, Math.round(pwm)));
-      if (!combatBackup && (savedVr !== clamped || savedVg !== clamped)) {
-        setCombatBackup({ vr: savedVr, vg: savedVg });
-      }
+      setBenchOverrideActive(true);
       setSpeedPwm(clamped);
-      void setBenchSpeed(clamped, clamped);
+      // Envia BVEL,<pwm>* (somente RAM) para nunca sobrescrever VR/VG salvos na NVS/EEPROM
+      void setManualBenchSpeed(clamped);
     },
-    [combatBackup, savedVg, savedVr, setBenchSpeed],
+    [setManualBenchSpeed],
   );
 
   const restoreCombatSpeed = () => {
-    if (!combatBackup) return;
     Vibration.vibrate(20);
-    const { vr, vg } = combatBackup;
-    setCombatBackup(null);
-    setSpeedPwm(vr);
-    void setBenchSpeed(vr, vg);
+    setBenchOverrideActive(false);
+    setSpeedPwm(savedVr);
+    void setManualBenchSpeed(0);
   };
 
   const activeSpec = SECTORS[activeSector];
@@ -318,11 +315,11 @@ export const ManualDrivePad = React.memo(function ManualDrivePad({
           </Pressable>
         </View>
 
-        {combatBackup ? (
+        {benchOverrideActive ? (
           <Pressable onPress={restoreCombatSpeed} style={styles.restoreBtn}>
             <RotateCcw color="#F59E0B" size={11} />
             <Text style={styles.restoreText}>
-              Restaurar {combatBackup.vr}/{combatBackup.vg}
+              Usar combate ({savedVr}/{savedVg})
             </Text>
           </Pressable>
         ) : (

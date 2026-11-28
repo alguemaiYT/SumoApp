@@ -1,5 +1,6 @@
 import {
   Compass,
+  Eye,
   Send,
   Share2,
   Target,
@@ -20,12 +21,12 @@ import {
 } from 'react-native';
 
 import { ManualDrivePad } from '@/components/sumo/ManualDrivePad';
-import { lipo2sStatus } from '@/lib/sumo/protocol';
+import { isLineEdgeDetected, lipo2sStatus } from '@/lib/sumo/protocol';
 import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
 export type BenchTab = 'controle' | 'calibracao' | 'ficha';
 
-const QUICK_CMDS = ['INFO*', 'dados*', 'ZERO_YAW*', 'CAL*', 'PARADA*'] as const;
+const QUICK_CMDS = ['INFO*', 'dados*', 'CAL_PRETO*', 'CAL_BRANCO*', 'PARADA*'] as const;
 
 function fmtSigned(val: number, digits: number): string {
   const fixed = val.toFixed(digits);
@@ -161,15 +162,15 @@ function BenchCalibrationReadouts({
           },
           {
             k: 'Linha Esq (LE · 39)',
-            cur: `${telemetry.sensorLE}`,
-            ref: `limiar ≤ ${info.linhaLimiarEsq}`,
-            warn: false,
+            cur: `${telemetry.sensorLE}${isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow) ? ' · BORDA' : ''}`,
+            ref: `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarEsq}`,
+            warn: isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow),
           },
           {
             k: 'Linha Dir (LD · 26)',
-            cur: `${telemetry.sensorLD}`,
-            ref: `limiar ≤ ${info.linhaLimiarDir}`,
-            warn: false,
+            cur: `${telemetry.sensorLD}${isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow) ? ' · BORDA' : ''}`,
+            ref: `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarDir}`,
+            warn: isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow),
           },
         ].map((row) => (
           <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
@@ -197,10 +198,16 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const logScrollRef = React.useRef<ScrollView>(null);
 
   const logs = useSumoStore((s) => s.logs);
+  const info = useSumoStore((s) => s.info);
+  const lastLineCalEvent = useSumoStore((s) => s.lastLineCalEvent);
+  const lineTestActive = useSumoStore((s) => s.lineTestActive);
   const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
 
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
+  const calibrateBlack = useSumoStore((s) => s.calibrateBlack);
+  const calibrateWhite = useSumoStore((s) => s.calibrateWhite);
+  const setLineCalTest = useSumoStore((s) => s.setLineCalTest);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
   const sendRaw = useSumoStore((s) => s.sendRaw);
   const clearLogs = useSumoStore((s) => s.clearLogs);
@@ -333,24 +340,118 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
       {/* SUB-TAB 2: CALIBRAÇÃO */}
       {subTab === 'calibracao' ? (
         <ScrollView style={styles.flex1} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>ROTINAS DE CALIBRAÇÃO</Text>
+          <View style={styles.fichaHeader}>
+            <Text style={styles.sectionTitleInline}>LINHA 2 PONTOS (PRETO + BRANCO · NVS)</Text>
+            <View style={styles.calBadgeRow}>
+              <View
+                style={[
+                  styles.calPill,
+                  info.lineCalFlags === 3
+                    ? styles.calPillOk
+                    : info.lineCalFlags > 0
+                      ? styles.calPillWarn
+                      : styles.calPillMuted,
+                ]}
+              >
+                <Text style={styles.calPillText}>
+                  {info.lineCalFlags === 3
+                    ? '2P OK'
+                    : info.lineCalFlags === 1
+                      ? 'SÓ PRETO'
+                      : info.lineCalFlags === 2
+                        ? 'SÓ BRANCO'
+                        : 'PADRÃO'}
+                </Text>
+              </View>
+              <View style={[styles.calPill, info.nvsOk ? styles.calPillOk : styles.calPillErr]}>
+                <Text style={styles.calPillText}>{info.nvsOk ? 'NVS OK' : 'ERRO NVS'}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.calStepRow}>
+            <Pressable
+              onPress={() => {
+                Vibration.vibrate(35);
+                setCalFeedback('1/2 Medindo PRETO da pista e salvando na NVS...');
+                void calibrateBlack();
+              }}
+              style={[styles.calStepBtn, { backgroundColor: surface, borderColor: divider }]}
+            >
+              <Text style={styles.calStepTag}>PASSO 1</Text>
+              <Text style={styles.calStepTitle}>Calibrar PRETO</Text>
+              <Text style={styles.calStepSub}>LD e LE no centro preto</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                Vibration.vibrate(35);
+                setCalFeedback('2/2 Medindo BRANCO da borda, detectando polaridade e salvando na NVS...');
+                void calibrateWhite();
+              }}
+              style={[styles.calStepBtn, { backgroundColor: surface, borderColor: '#FF4D00' }]}
+            >
+              <Text style={[styles.calStepTag, { color: '#FF4D00' }]}>PASSO 2</Text>
+              <Text style={styles.calStepTitle}>Calibrar BRANCO</Text>
+              <Text style={styles.calStepSub}>LD e LE sobre a borda</Text>
+            </Pressable>
+          </View>
 
           <Pressable
             onPress={() => {
-              Vibration.vibrate(35);
-              setCalFeedback('Calibrando sensores de linha (pista preta) e offsets da IMU...');
-              void calibrateAll();
+              Vibration.vibrate(25);
+              const next = !lineTestActive;
+              setCalFeedback(
+                next
+                  ? 'Modo teste ativo (motores travados): LED1 = LD borda · LED2 = LE borda.'
+                  : 'Modo teste nos LEDs encerrado.',
+              );
+              void setLineCalTest(next);
             }}
-            style={[styles.calAction, { backgroundColor: surface, borderColor: divider }]}
+            style={[
+              styles.calAction,
+              {
+                backgroundColor: lineTestActive ? 'rgba(255,77,0,0.14)' : surface,
+                borderColor: lineTestActive ? '#FF4D00' : divider,
+              },
+            ]}
           >
-            <Target color="#FF4D00" size={20} />
+            <Eye color={lineTestActive ? '#FF4D00' : '#FAFAFA'} size={20} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.calTitle}>Calibrar Linha + IMU</Text>
+              <Text style={styles.calTitle}>
+                {lineTestActive ? 'Parar Teste de Borda nos LEDs' : '3. Testar Borda nos LEDs (Sem Motores)'}
+              </Text>
               <Text style={styles.calSub}>
-                Posicione o robô imóvel sobre a área preta do dohyō
+                {lineTestActive
+                  ? 'Arraste o robô na faixa branca: LED1 = LD · LED2 = LE'
+                  : `Polaridade atual: ${info.lineWhiteIsLow ? 'BRANCO < PRETO' : 'BRANCO > PRETO'} · LD ${info.linhaLimiarDir} / LE ${info.linhaLimiarEsq}`}
               </Text>
             </View>
           </Pressable>
+
+          {lastLineCalEvent ? (
+            <View
+              style={[
+                styles.feedbackRow,
+                {
+                  borderColor:
+                    lastLineCalEvent.ok && lastLineCalEvent.nvsOk
+                      ? 'rgba(34,197,94,0.45)'
+                      : 'rgba(245,158,11,0.55)',
+                },
+              ]}
+            >
+              <Text style={styles.feedbackText}>
+                {lastLineCalEvent.kind === 'preto'
+                  ? `PRETO salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                  : lastLineCalEvent.ok
+                    ? `BRANCO 2P salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} (Δ${lastLineCalEvent.cDir ?? 0}) · LE=${lastLineCalEvent.le} (Δ${lastLineCalEvent.cEsq ?? 0}) → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr} (${lastLineCalEvent.whiteIsLow ? 'B<P' : 'B>P'})`
+                    : `Contraste baixo ao medir BRANCO (ΔLD=${lastLineCalEvent.cDir ?? 0}, ΔLE=${lastLineCalEvent.cEsq ?? 0})! Confirme os 2 sensores sobre a faixa branca e repita.`}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>IMU & CALIBRAÇÃO RÁPIDA</Text>
 
           <Pressable
             onPress={() => {
@@ -364,7 +465,24 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
             <View style={{ flex: 1 }}>
               <Text style={styles.calTitle}>Calibrar Somente IMU</Text>
               <Text style={styles.calSub}>
-                Zera drift do giroscópio (Z) e referencial de aceleração
+                Zera drift do giroscópio (Z) e referencial de aceleração na NVS
+              </Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              Vibration.vibrate(35);
+              setCalFeedback('Calibrando piso preto + offsets da IMU...');
+              void calibrateAll();
+            }}
+            style={[styles.calAction, { backgroundColor: surface, borderColor: divider }]}
+          >
+            <Target color="#FF4D00" size={20} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.calTitle}>Calibrar Preto + IMU (Rápido)</Text>
+              <Text style={styles.calSub}>
+                Posicione o robô imóvel sobre a área preta do dohyō
               </Text>
             </View>
           </Pressable>
@@ -823,6 +941,68 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     borderWidth: 1,
+  },
+  calBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  calPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  calPillOk: {
+    backgroundColor: 'rgba(34,197,94,0.14)',
+    borderColor: 'rgba(34,197,94,0.45)',
+  },
+  calPillWarn: {
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderColor: 'rgba(245,158,11,0.45)',
+  },
+  calPillErr: {
+    backgroundColor: 'rgba(239,68,68,0.18)',
+    borderColor: 'rgba(239,68,68,0.55)',
+  },
+  calPillMuted: {
+    backgroundColor: '#18181B',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  calPillText: {
+    color: '#FAFAFA',
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  calStepRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  calStepBtn: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 3,
+  },
+  calStepTag: {
+    color: '#9A9AA6',
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 0.9,
+  },
+  calStepTitle: {
+    color: '#FAFAFA',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  calStepSub: {
+    color: '#B4B4BE',
+    fontSize: 11,
   },
   calTitle: {
     color: '#FAFAFA',

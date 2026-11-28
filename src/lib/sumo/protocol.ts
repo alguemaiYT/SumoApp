@@ -196,9 +196,35 @@ export interface RobotInfoData {
   rollDeg: number;
   linhaLimiarDir: number;
   linhaLimiarEsq: number;
+  lineWhiteIsLow: boolean;
+  lineCalFlags: number;
+  nvsOk: boolean;
   irStartDelayMs: number;
   firmwareBranch: 'debug' | 'exper' | 'unknown';
   timestamp: number;
+}
+
+export interface LineCalEvent {
+  kind: 'preto' | 'branco';
+  ok: boolean;
+  ld: number;
+  le: number;
+  cDir?: number;
+  cEsq?: number;
+  ldThr: number;
+  leThr: number;
+  whiteIsLow: boolean;
+  calFlags: number;
+  nvsOk: boolean;
+  timestamp: number;
+}
+
+export function isLineEdgeDetected(
+  adc: number,
+  threshold: number,
+  whiteIsLow: boolean,
+): boolean {
+  return whiteIsLow ? adc <= threshold : adc >= threshold;
 }
 
 export type BenchJogDirection = 'FRENTE' | 'RE' | 'ESQ' | 'DIR';
@@ -253,6 +279,21 @@ export const cmdEmergencyStop = (): string => 'PARADA*';
 export const cmdRequestTelemetry = (): string => 'dados*';
 export const cmdRequestInfo = (): string => 'INFO*';
 export const cmdCalibrateAll = (): string => 'CAL*';
+export const cmdCalibrateBlack = (): string => 'CAL_PRETO*';
+export const cmdCalibrateWhite = (): string => 'CAL_BRANCO*';
+export const cmdLineCalTest = (enabled: boolean): string => `CAL_TEST,${enabled ? 1 : 0}*`;
+export const cmdLineThresholds = (
+  ldThr: number,
+  leThr: number,
+  whiteIsLow?: boolean,
+): string => {
+  const ld = clampInt(ldThr, 120, 3900);
+  const le = clampInt(leThr, 120, 3900);
+  return whiteIsLow === undefined
+    ? `LINHA_THR,${ld},${le}*`
+    : `LINHA_THR,${ld},${le},${whiteIsLow ? 1 : 0}*`;
+};
+export const cmdBenchSpeed = (pwm: number): string => `BVEL,${clampInt(pwm, 0, 255)}*`;
 export const cmdCalibrateImu = (): string => 'IMU_CAL*';
 export const cmdZeroYaw = (): string => 'ZERO_YAW*';
 export const cmdStreamTelemetry = (enabled: boolean): string => `STREAM,${enabled ? 1 : 0}*`;
@@ -366,8 +407,53 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
     rollDeg,
     linhaLimiarDir: Number.parseInt(map.ldThr ?? '250', 10) || 250,
     linhaLimiarEsq: Number.parseInt(map.leThr ?? '250', 10) || 250,
+    lineWhiteIsLow: map.wLow !== undefined ? map.wLow !== '0' : true,
+    lineCalFlags: Number.parseInt(map.lCal ?? '0', 10) || 0,
+    nvsOk: map.nvs !== undefined ? map.nvs !== '0' : true,
     irStartDelayMs: Number.parseInt(map.ird ?? '0', 10) || 0,
     firmwareBranch,
+    timestamp: now,
+  };
+}
+
+export function parseLineCalEvent(raw: string, now = Date.now()): LineCalEvent | null {
+  const trimmed = raw.trim();
+  const isPreto = trimmed.startsWith('CAL_PRETO|');
+  const isBranco = trimmed.startsWith('CAL_BRANCO|');
+  if (!isPreto && !isBranco) return null;
+
+  const prefixLen = isPreto ? 10 : 11;
+  const map: Record<string, string> = {};
+  for (const token of trimmed.slice(prefixLen).split('|')) {
+    const eq = token.indexOf('=');
+    if (eq > 0) {
+      map[token.slice(0, eq)] = token.slice(eq + 1);
+    }
+  }
+
+  const ld = Number.parseInt(map.ld ?? '', 10);
+  const le = Number.parseInt(map.le ?? '', 10);
+  const ldThr = Number.parseInt(map.ldThr ?? '', 10);
+  const leThr = Number.parseInt(map.leThr ?? '', 10);
+  if (![ld, le, ldThr, leThr].every((n) => Number.isFinite(n))) {
+    return null;
+  }
+
+  const cDirRaw = map.cDir !== undefined ? Number.parseInt(map.cDir, 10) : Number.NaN;
+  const cEsqRaw = map.cEsq !== undefined ? Number.parseInt(map.cEsq, 10) : Number.NaN;
+
+  return {
+    kind: isPreto ? 'preto' : 'branco',
+    ok: map.ok !== undefined ? map.ok !== '0' : true,
+    ld,
+    le,
+    cDir: Number.isFinite(cDirRaw) ? cDirRaw : undefined,
+    cEsq: Number.isFinite(cEsqRaw) ? cEsqRaw : undefined,
+    ldThr,
+    leThr,
+    whiteIsLow: map.wLow !== undefined ? map.wLow !== '0' : true,
+    calFlags: Number.parseInt(map.cal ?? '0', 10) || 0,
+    nvsOk: map.nvs !== undefined ? map.nvs !== '0' : true,
     timestamp: now,
   };
 }

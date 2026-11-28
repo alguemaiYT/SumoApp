@@ -5,6 +5,7 @@ import { Modal, Pressable, StyleSheet, Text, Vibration, View } from 'react-nativ
 import { WebView } from 'react-native-webview';
 
 import { acquireTabSwipeLock, releaseTabSwipeLock } from '@/lib/sumo/gesture-lock';
+import { isLineEdgeDetected } from '@/lib/sumo/protocol';
 import {
   getLiveTelemetrySnapshot,
   type LiveTelemetrySnapshot,
@@ -39,8 +40,8 @@ const WEBVIEW_PUSH_INTERVAL_MS = 80;
 
 function serializeSnapshot(snap: LiveTelemetrySnapshot): string {
   const { telemetry, info, connected } = snap;
-  const leEdge = telemetry.sensorLE <= info.linhaLimiarEsq;
-  const ldEdge = telemetry.sensorLD <= info.linhaLimiarDir;
+  const leEdge = isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow);
+  const ldEdge = isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow);
   return JSON.stringify({
     connected,
     pitchDeg: info.pitchDeg,

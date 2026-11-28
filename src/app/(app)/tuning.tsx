@@ -134,6 +134,7 @@ export default function TuningScreen() {
   const savedLimiarParado = useSumoStore((s) => s.telemetry.limiarParado);
   const savedLimiarEmpurrado = useSumoStore((s) => s.telemetry.limiarEmpurrado);
   const irStartDelayMs = useSumoStore((s) => s.info.irStartDelayMs);
+  const nvsOk = useSumoStore((s) => s.info.nvsOk);
   const highContrast = useSumoStore((s) => s.highContrast);
   const saveTuning = useSumoStore((s) => s.saveTuning);
   const resetRobotConfig = useSumoStore((s) => s.resetRobotConfig);
@@ -143,8 +144,10 @@ export default function TuningScreen() {
   const [hbevasao, setHbevasao] = React.useState(savedHbevasao);
   const [limiarParado, setLimiarParado] = React.useState(savedLimiarParado);
   const [limiarEmpurrado, setLimiarEmpurrado] = React.useState(savedLimiarEmpurrado);
+  const isEditingRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (isEditingRef.current) return;
     setVelocreta(savedVelocreta);
     setVelocgiro(savedVelocgiro);
     setHbevasao(savedHbevasao);
@@ -158,6 +161,27 @@ export default function TuningScreen() {
     savedLimiarEmpurrado,
   ]);
 
+  const editVelocreta = (v: number) => {
+    isEditingRef.current = true;
+    setVelocreta(v);
+  };
+  const editVelocgiro = (v: number) => {
+    isEditingRef.current = true;
+    setVelocgiro(v);
+  };
+  const editHbevasao = (v: boolean) => {
+    isEditingRef.current = true;
+    setHbevasao(v);
+  };
+  const editLimiarParado = (v: number) => {
+    isEditingRef.current = true;
+    setLimiarParado(v);
+  };
+  const editLimiarEmpurrado = (v: number) => {
+    isEditingRef.current = true;
+    setLimiarEmpurrado(v);
+  };
+
   const changesCount =
     (velocreta !== savedVelocreta ? 1 : 0) +
     (velocgiro !== savedVelocgiro ? 1 : 0) +
@@ -166,9 +190,13 @@ export default function TuningScreen() {
     (Math.abs(limiarEmpurrado - savedLimiarEmpurrado) > 0.001 ? 1 : 0);
 
   const isDirty = changesCount > 0;
+  if (!isDirty) {
+    isEditingRef.current = false;
+  }
 
   const loadPresetIntoDraft = (preset: TournamentPreset) => {
     Vibration.vibrate(25);
+    isEditingRef.current = true;
     setVelocreta(preset.velocreta);
     setVelocgiro(preset.velocgiro);
     setHbevasao(preset.HBEvasao);
@@ -177,6 +205,7 @@ export default function TuningScreen() {
   };
 
   const discardDraft = () => {
+    isEditingRef.current = false;
     setVelocreta(savedVelocreta);
     setVelocgiro(savedVelocgiro);
     setHbevasao(savedHbevasao);
@@ -195,6 +224,7 @@ export default function TuningScreen() {
           style: 'destructive',
           onPress: () => {
             Vibration.vibrate(60);
+            isEditingRef.current = false;
             void resetRobotConfig();
           },
         },
@@ -259,7 +289,7 @@ export default function TuningScreen() {
             unit="PWM"
             value={velocreta}
             savedValue={savedVelocreta}
-            onChange={setVelocreta}
+            onChange={editVelocreta}
             step={5}
             min={0}
             max={255}
@@ -271,7 +301,7 @@ export default function TuningScreen() {
             unit="PWM"
             value={velocgiro}
             savedValue={savedVelocgiro}
-            onChange={setVelocgiro}
+            onChange={editVelocgiro}
             step={5}
             min={0}
             max={255}
@@ -293,7 +323,7 @@ export default function TuningScreen() {
             </View>
             <Switch
               value={hbevasao}
-              onValueChange={setHbevasao}
+              onValueChange={editHbevasao}
               trackColor={{ false: '#27272A', true: '#FF4D00' }}
               thumbColor="#FAFAFA"
             />
@@ -305,7 +335,7 @@ export default function TuningScreen() {
             unit="m/s²"
             value={limiarParado}
             savedValue={savedLimiarParado}
-            onChange={setLimiarParado}
+            onChange={editLimiarParado}
             step={0.05}
             min={0.02}
             max={2.0}
@@ -318,7 +348,7 @@ export default function TuningScreen() {
             unit="m/s²"
             value={limiarEmpurrado}
             savedValue={savedLimiarEmpurrado}
-            onChange={setLimiarEmpurrado}
+            onChange={editLimiarEmpurrado}
             step={0.05}
             min={-3.0}
             max={-0.05}
@@ -347,6 +377,7 @@ export default function TuningScreen() {
             <Pressable
               onPress={() => {
                 Vibration.vibrate(45);
+                isEditingRef.current = false;
                 void saveTuning({
                   velocreta,
                   velocgiro,
@@ -360,13 +391,15 @@ export default function TuningScreen() {
             >
               <Save color="#FFFFFF" size={15} />
               <Text style={styles.saveBtnText}>
-                {changesCount === 1 ? '1 alteração' : `${changesCount} alterações`} · Salvar EEPROM
+                {changesCount === 1 ? '1 alteração' : `${changesCount} alterações`} · Salvar NVS
               </Text>
             </Pressable>
           </>
         ) : (
           <View style={styles.syncedBar}>
-            <Text style={styles.syncedText}>Sincronizado com EEPROM do robô</Text>
+            <Text style={[styles.syncedText, !nvsOk && { color: '#EF4444' }]}>
+              {nvsOk ? 'Sincronizado com NVS/EEPROM do robô' : 'Alerta: falha ao gravar na NVS do robô'}
+            </Text>
           </View>
         )}
       </View>

@@ -2,6 +2,8 @@ import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
+import { isLineEdgeDetected } from '@/lib/sumo/protocol';
+
 interface RobotRadarProps {
   senEsq: number;
   senCentroEsq: number;
@@ -11,6 +13,7 @@ interface RobotRadarProps {
   sensorLD: number;
   thrLE: number;
   thrLD: number;
+  whiteIsLow?: boolean;
   headingDeg?: number;
   highContrast?: boolean;
 }
@@ -24,6 +27,7 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
   sensorLD,
   thrLE,
   thrLD,
+  whiteIsLow = true,
   headingDeg = 0,
   highContrast = false,
 }: RobotRadarProps) {
@@ -32,8 +36,9 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
   const scdOn = senCentroDir === 1;
   const sdOn = senDir === 1;
 
-  const leEdge = sensorLE <= thrLE;
-  const ldEdge = sensorLD <= thrLD;
+  const leEdge = isLineEdgeDetected(sensorLE, thrLE, whiteIsLow);
+  const ldEdge = isLineEdgeDetected(sensorLD, thrLD, whiteIsLow);
+  const thrOp = whiteIsLow ? '≤' : '≥';
 
   // Heading needle inside chassis (+headingDeg = CCW/left, -headingDeg = CW/right)
   const hdgRad = (-headingDeg * Math.PI) / 180;
@@ -219,7 +224,7 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
           </View>
           <View style={styles.lineValRow}>
             <Text style={[styles.lineValue, leEdge && { color: '#FAFAFA' }]}>{sensorLE}</Text>
-            <Text style={styles.lineThr}>≤ {thrLE}</Text>
+            <Text style={styles.lineThr}>{thrOp} {thrLE}</Text>
           </View>
         </View>
 
@@ -236,7 +241,7 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
           </View>
           <View style={styles.lineValRow}>
             <Text style={[styles.lineValue, ldEdge && { color: '#FAFAFA' }]}>{sensorLD}</Text>
-            <Text style={styles.lineThr}>≤ {thrLD}</Text>
+            <Text style={styles.lineThr}>{thrOp} {thrLD}</Text>
           </View>
         </View>
       </View>
