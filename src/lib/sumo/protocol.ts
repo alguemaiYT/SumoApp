@@ -214,10 +214,14 @@ export interface RobotInfoData {
 }
 
 export interface LineCalEvent {
-  kind: 'preto' | 'branco';
+  kind: 'preto' | 'branco' | 'sweep';
   ok: boolean;
   ld: number;
   le: number;
+  ldMin?: number;
+  ldMax?: number;
+  leMin?: number;
+  leMax?: number;
   cDir?: number;
   cEsq?: number;
   ldThr: number;
@@ -225,6 +229,19 @@ export interface LineCalEvent {
   whiteIsLow: boolean;
   calFlags: number;
   nvsOk: boolean;
+  timestamp: number;
+}
+
+export interface LineSweepProgress {
+  active: boolean;
+  remainingMs: number;
+  durationMs: number;
+  ld: number;
+  ldMin: number;
+  ldMax: number;
+  le: number;
+  leMin: number;
+  leMax: number;
   timestamp: number;
 }
 
@@ -292,6 +309,8 @@ export const cmdRequestInfo = (): string => 'INFO*';
 export const cmdCalibrateAll = (): string => 'CAL*';
 export const cmdCalibrateBlack = (): string => 'CAL_PRETO*';
 export const cmdCalibrateWhite = (): string => 'CAL_BRANCO*';
+export const cmdCalibrateSweep = (durationMs = 8000): string =>
+  durationMs <= 0 ? 'CAL_SWEEP,0*' : `CAL_SWEEP,${clampInt(durationMs, 1000, 15000)}*`;
 export const cmdLineCalTest = (enabled: boolean): string => `CAL_TEST,${enabled ? 1 : 0}*`;
 export const cmdLineThresholds = (
   ldThr: number,
@@ -432,13 +451,53 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
   };
 }
 
+export function parseLineSweepProgress(
+  raw: string,
+  durationMs = 8000,
+  now = Date.now(),
+): LineSweepProgress | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('CAL_SWEEP_PROG|')) return null;
+
+  const map: Record<string, string> = {};
+  for (const token of trimmed.slice(15).split('|')) {
+    const eq = token.indexOf('=');
+    if (eq > 0) {
+      map[token.slice(0, eq)] = token.slice(eq + 1);
+    }
+  }
+
+  const active = map.active !== '0';
+  const remainingMs = Math.max(0, Number.parseInt(map.ms ?? '0', 10) || 0);
+  const ld = Number.parseInt(map.ld ?? '0', 10) || 0;
+  const ldMin = Number.parseInt(map.ldMin ?? '4095', 10);
+  const ldMax = Number.parseInt(map.ldMax ?? '0', 10);
+  const le = Number.parseInt(map.le ?? '0', 10) || 0;
+  const leMin = Number.parseInt(map.leMin ?? '4095', 10);
+  const leMax = Number.parseInt(map.leMax ?? '0', 10);
+
+  return {
+    active,
+    remainingMs,
+    durationMs: Math.max(durationMs, remainingMs),
+    ld,
+    ldMin: Number.isFinite(ldMin) ? ldMin : 4095,
+    ldMax: Number.isFinite(ldMax) ? ldMax : 0,
+    le,
+    leMin: Number.isFinite(leMin) ? leMin : 4095,
+    leMax: Number.isFinite(leMax) ? leMax : 0,
+    timestamp: now,
+  };
+}
+
 export function parseLineCalEvent(raw: string, now = Date.now()): LineCalEvent | null {
   const trimmed = raw.trim();
   const isPreto = trimmed.startsWith('CAL_PRETO|');
   const isBranco = trimmed.startsWith('CAL_BRANCO|');
-  if (!isPreto && !isBranco) return null;
+  const isSweep = trimmed.startsWith('CAL_SWEEP|');
+  if (!isPreto && !isBranco && !isSweep) return null;
 
-  const prefixLen = isPreto ? 10 : 11;
+  const prefixLen = isBranco ? 11 : 10;
   const map: Record<string, string> = {};
   for (const token of trimmed.slice(prefixLen).split('|')) {
     const eq = token.indexOf('=');
@@ -447,11 +506,22 @@ export function parseLineCalEvent(raw: string, now = Date.now()): LineCalEvent |
     }
   }
 
-  const ld = Number.parseInt(map.ld ?? '', 10);
-  const le = Number.parseInt(map.le ?? '', 10);
   const ldThr = Number.parseInt(map.ldThr ?? '', 10);
   const leThr = Number.parseInt(map.leThr ?? '', 10);
-  if (![ld, le, ldThr, leThr].every((n) => Number.isFinite(n))) {
+  if (![ldThr, leThr].every((n) => Number.isFinite(n))) {
+    return null;
+  }
+
+  const ldMinRaw = map.ldMin !== undefined ? Number.parseInt(map.ldMin, 10) : Number.NaN;
+  const ldMaxRaw = map.ldMax !== undefined ? Number.parseInt(map.ldMax, 10) : Number.NaN;
+  const leMinRaw = map.leMin !== undefined ? Number.parseInt(map.leMin, 10) : Number.NaN;
+  const leMaxRaw = map.leMax !== undefined ? Number.parseInt(map.leMax, 10) : Number.NaN;
+
+  const ldRaw = Number.parseInt(map.ld ?? '', 10);
+  const leRaw = Number.parseInt(map.le ?? '', 10);
+  const ld = Number.isFinite(ldRaw) ? ldRaw : ldMinRaw;
+  const le = Number.isFinite(leRaw) ? leRaw : leMinRaw;
+  if (![ld, le].every((n) => Number.isFinite(n))) {
     return null;
   }
 
@@ -459,10 +529,14 @@ export function parseLineCalEvent(raw: string, now = Date.now()): LineCalEvent |
   const cEsqRaw = map.cEsq !== undefined ? Number.parseInt(map.cEsq, 10) : Number.NaN;
 
   return {
-    kind: isPreto ? 'preto' : 'branco',
+    kind: isSweep ? 'sweep' : isPreto ? 'preto' : 'branco',
     ok: map.ok !== undefined ? map.ok !== '0' : true,
     ld,
     le,
+    ldMin: Number.isFinite(ldMinRaw) ? ldMinRaw : undefined,
+    ldMax: Number.isFinite(ldMaxRaw) ? ldMaxRaw : undefined,
+    leMin: Number.isFinite(leMinRaw) ? leMinRaw : undefined,
+    leMax: Number.isFinite(leMaxRaw) ? leMaxRaw : undefined,
     cDir: Number.isFinite(cDirRaw) ? cDirRaw : undefined,
     cEsq: Number.isFinite(cEsqRaw) ? cEsqRaw : undefined,
     ldThr,

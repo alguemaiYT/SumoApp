@@ -8,6 +8,7 @@ import {
   cmdCalibrateAll,
   cmdCalibrateBlack,
   cmdCalibrateImu,
+  cmdCalibrateSweep,
   cmdCalibrateWhite,
   cmdEmergencyStop,
   cmdHbevasao,
@@ -31,6 +32,7 @@ import {
   parseDadosLine,
   parseInfoLine,
   parseLineCalEvent,
+  parseLineSweepProgress,
   STRATEGIES,
 } from '../protocol';
 import { decodeBase64ToUtf8, encodeUtf8ToBase64 } from '../base64';
@@ -70,6 +72,8 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdCalibrateAll()).toBe('CAL*');
     expect(cmdCalibrateBlack()).toBe('CAL_PRETO*');
     expect(cmdCalibrateWhite()).toBe('CAL_BRANCO*');
+    expect(cmdCalibrateSweep()).toBe('CAL_SWEEP,8000*');
+    expect(cmdCalibrateSweep(0)).toBe('CAL_SWEEP,0*');
     expect(cmdLineCalTest(true)).toBe('CAL_TEST,1*');
     expect(cmdLineCalTest(false)).toBe('CAL_TEST,0*');
     expect(cmdLineThresholds(1550, 1620)).toBe('LINHA_THR,1550,1620*');
@@ -196,6 +200,48 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     );
     expect(lbmOnlyLeft?.lineSensorMode).toBe(2);
     expect(lbmOnlyLeft?.firmwareBranch).toBe('debug');
+
+    // QTR 8s sweep progress + final result parsing
+    const prog = parseLineSweepProgress(
+      'CAL_SWEEP_PROG|active=1|ms=5400|ld=1900|ldMin=310|ldMax=3120|le=2010|leMin=285|leMax=3240',
+      8000,
+      2400,
+    );
+    expect(prog).toEqual({
+      active: true,
+      remainingMs: 5400,
+      durationMs: 8000,
+      ld: 1900,
+      ldMin: 310,
+      ldMax: 3120,
+      le: 2010,
+      leMin: 285,
+      leMax: 3240,
+      timestamp: 2400,
+    });
+
+    const sweepDone = parseLineCalEvent(
+      'CAL_SWEEP|ok=1|ldMin=310|ldMax=3120|leMin=285|leMax=3240|cDir=2810|cEsq=2955|ldThr=1658|leThr=1703|wLow=1|cal=3|nvs=1',
+      2500,
+    );
+    expect(sweepDone).toEqual({
+      kind: 'sweep',
+      ok: true,
+      ld: 310,
+      le: 285,
+      ldMin: 310,
+      ldMax: 3120,
+      leMin: 285,
+      leMax: 3240,
+      cDir: 2810,
+      cEsq: 2955,
+      ldThr: 1658,
+      leThr: 1703,
+      whiteIsLow: true,
+      calFlags: 3,
+      nvsOk: true,
+      timestamp: 2500,
+    });
   });
 
   test('computes realistic 2S LiPo health percentage and alert levels', () => {

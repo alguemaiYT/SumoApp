@@ -11,6 +11,7 @@ import type {
   BenchMotorSide,
   LineBorderMode,
   LineCalEvent,
+  LineSweepProgress,
   RobotInfoData,
   StrategyId,
   TelemetryData,
@@ -23,6 +24,7 @@ import {
   cmdCalibrateAll,
   cmdCalibrateBlack,
   cmdCalibrateImu,
+  cmdCalibrateSweep,
   cmdCalibrateWhite,
   cmdEmergencyStop,
   cmdHbevasao,
@@ -44,6 +46,7 @@ import {
   parseDadosLine,
   parseInfoLine,
   parseLineCalEvent,
+  parseLineSweepProgress,
 } from './protocol';
 
 export interface ConsoleEntry {
@@ -167,6 +170,7 @@ interface SumoStore {
   telemetry: TelemetryData;
   info: RobotInfoData;
   lastLineCalEvent: LineCalEvent | null;
+  lineSweep: LineSweepProgress | null;
   lineTestActive: boolean;
   logs: ConsoleEntry[];
   measurements: MeasurementRecord;
@@ -198,6 +202,8 @@ interface SumoStore {
   calibrateAll: () => Promise<void>;
   calibrateBlack: () => Promise<void>;
   calibrateWhite: () => Promise<void>;
+  startLineSweep: (durationMs?: number) => Promise<void>;
+  cancelLineSweep: () => Promise<void>;
   setLineBorderMode: (mode: LineBorderMode) => Promise<void>;
   setLineCalTest: (enabled: boolean) => Promise<void>;
   calibrateImu: () => Promise<void>;
@@ -230,6 +236,7 @@ const UI_COMMIT_INTERVAL_MS = 140;
 
 let transport: SumoBleTransport | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let simSweepTimer: ReturnType<typeof setInterval> | null = null;
 let motorPulseTimer: ReturnType<typeof setTimeout> | null = null;
 let uiFlushTimer: ReturnType<typeof setTimeout> | null = null;
 let appStateSub: { remove: () => void } | null = null;
@@ -283,6 +290,13 @@ function clearMotorPulseTimer(): void {
   if (motorPulseTimer) {
     clearTimeout(motorPulseTimer);
     motorPulseTimer = null;
+  }
+}
+
+function clearSimSweepTimer(): void {
+  if (simSweepTimer) {
+    clearInterval(simSweepTimer);
+    simSweepTimer = null;
   }
 }
 
@@ -442,9 +456,24 @@ export const useSumoStore = create<SumoStore>((set, get) => {
       scheduleUiFlush(discreteChanged);
       return;
     }
+    const sweepProg = parseLineSweepProgress(line, get().lineSweep?.durationMs ?? 8000);
+    if (sweepProg) {
+      set({ lineSweep: sweepProg.active ? sweepProg : null });
+      return;
+    }
     const calEvt = parseLineCalEvent(line);
     if (calEvt) {
-      set({ lastLineCalEvent: calEvt });
+      if (calEvt.kind === 'sweep') {
+        try {
+          Vibration?.vibrate?.(calEvt.ok ? [0, 45, 60, 75] : 90);
+        } catch {
+          // ignore on non-native environments
+        }
+      }
+      set({
+        lastLineCalEvent: calEvt,
+        ...(calEvt.kind === 'sweep' ? { lineSweep: null } : {}),
+      });
       appendLog('rx', line);
       return;
     }
@@ -480,8 +509,8 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         );
         return;
       }
-      // When firmware STREAM,1* is active, ESP32 pushes interleaved frames on its own
-      if (state.stream3dActive) {
+      // When firmware STREAM,1* or 8s QTR sweep is active, ESP32 pushes frames on its own
+      if (state.stream3dActive || state.lineSweep?.active) {
         return;
       }
       // Alternate single non-overlapping coalescable writes (~2 Hz each, zero GATT contention)
@@ -575,6 +604,54 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         };
         set((s) => ({ info: { ...s.info, ...liveInfo }, lastLineCalEvent: evt }));
         appendLog('rx', 'SIM: CAL_BRANCO 2 pontos salvo na NVS');
+      } else if (key === 'CAL_SWEEP') {
+        clearSimSweepTimer();
+        const dur = val !== undefined ? Number.parseInt(val, 10) : 8000;
+        if (dur <= 0) {
+          set({ lineSweep: null });
+          appendLog('rx', 'SIM: Calibração QTR 8s cancelada');
+        } else {
+          let rem = dur;
+          set({
+            lineSweep: {
+              active: true,
+              remainingMs: dur,
+              durationMs: dur,
+              ld: 2010,
+              ldMin: 2010,
+              ldMax: 2010,
+              le: 2030,
+              leMin: 2030,
+              leMax: 2030,
+              timestamp: Date.now(),
+            },
+          });
+          simSweepTimer = setInterval(() => {
+            rem = Math.max(0, rem - 250);
+            const sweptWhite = rem < dur - 800;
+            const curLd = rem % 500 < 250 ? 295 : 3090;
+            const curLe = rem % 500 < 250 ? 315 : 3180;
+            if (rem > 0) {
+              handleIncomingLine(
+                `CAL_SWEEP_PROG|active=1|ms=${rem}|ld=${curLd}|ldMin=${sweptWhite ? 295 : 2010}|ldMax=3090|le=${curLe}|leMin=${sweptWhite ? 315 : 2030}|leMax=3180`,
+              );
+            } else {
+              clearSimSweepTimer();
+              liveInfo = {
+                ...liveInfo,
+                linhaLimiarDir: 1636,
+                linhaLimiarEsq: 1690,
+                lineWhiteIsLow: true,
+                lineCalFlags: 3,
+                nvsOk: true,
+              };
+              set((s) => ({ info: { ...s.info, ...liveInfo } }));
+              handleIncomingLine(
+                'CAL_SWEEP|ok=1|ldMin=295|ldMax=3090|leMin=315|leMax=3180|cDir=2795|cEsq=2865|ldThr=1636|leThr=1690|wLow=1|cal=3|nvs=1',
+              );
+            }
+          }, 250);
+        }
       } else if (key === 'CAL_TEST') {
         const active = val === '1';
         set({ lineTestActive: active });
@@ -627,6 +704,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
     telemetry: DEFAULT_TELEMETRY,
     info: DEFAULT_INFO,
     lastLineCalEvent: null,
+    lineSweep: null,
     lineTestActive: false,
     logs: [makeLog('sys', 'SumoApp BLE NUS inicializado')],
     measurements: { ...DEFAULT_MEASUREMENTS, ...(savedMeasurements ?? {}) },
@@ -666,8 +744,9 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         onDisconnected: (wasCombat) => {
           liveConnected = false;
           stopPolling();
+          clearSimSweepTimer();
           clearUiFlushTimer();
-          set({ connectedDevice: null, lineTestActive: false });
+          set({ connectedDevice: null, lineTestActive: false, lineSweep: null });
           notifyLiveListeners();
           appendLog(
             'sys',
@@ -838,7 +917,8 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     emergencyStop: async () => {
       clearMotorPulseTimer();
-      set({ activePulseMotor: null, lineTestActive: false });
+      clearSimSweepTimer();
+      set({ activePulseMotor: null, lineTestActive: false, lineSweep: null });
       await sendCmd(cmdEmergencyStop(), { urgent: true });
       await sendCmd(cmdRequestInfo());
     },
@@ -853,6 +933,33 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     calibrateWhite: async () => {
       await sendCmd(cmdCalibrateWhite());
+    },
+
+    startLineSweep: async (durationMs = 8000) => {
+      const s = get();
+      if (!s.isSimulation && s.phase === 'connected') {
+        set({
+          lineSweep: {
+            active: true,
+            remainingMs: durationMs,
+            durationMs,
+            ld: liveTelemetry.sensorLD,
+            ldMin: 4095,
+            ldMax: 0,
+            le: liveTelemetry.sensorLE,
+            leMin: 4095,
+            leMax: 0,
+            timestamp: Date.now(),
+          },
+        });
+      }
+      await sendCmd(cmdCalibrateSweep(durationMs));
+    },
+
+    cancelLineSweep: async () => {
+      clearSimSweepTimer();
+      set({ lineSweep: null });
+      await sendCmd(cmdCalibrateSweep(0));
     },
 
     setLineBorderMode: async (mode) => {

@@ -30,7 +30,7 @@ import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
 export type BenchTab = 'controle' | 'calibracao' | 'ficha';
 
-const QUICK_CMDS = ['INFO*', 'dados*', 'CAL_PRETO*', 'CAL_BRANCO*', 'PARADA*'] as const;
+const QUICK_CMDS = ['INFO*', 'dados*', 'CAL_SWEEP,8000*', 'CAL_PRETO*', 'CAL_BRANCO*', 'PARADA*'] as const;
 
 function fmtSigned(val: number, digits: number): string {
   const fixed = val.toFixed(digits);
@@ -214,6 +214,7 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const logs = useSumoStore((s) => s.logs);
   const info = useSumoStore((s) => s.info);
   const lastLineCalEvent = useSumoStore((s) => s.lastLineCalEvent);
+  const lineSweep = useSumoStore((s) => s.lineSweep);
   const lineTestActive = useSumoStore((s) => s.lineTestActive);
   const highContrast = useSumoStore((s) => s.highContrast);
   const measurements = useSumoStore((s) => s.measurements);
@@ -221,6 +222,8 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
   const calibrateBlack = useSumoStore((s) => s.calibrateBlack);
   const calibrateWhite = useSumoStore((s) => s.calibrateWhite);
+  const startLineSweep = useSumoStore((s) => s.startLineSweep);
+  const cancelLineSweep = useSumoStore((s) => s.cancelLineSweep);
   const setLineBorderMode = useSumoStore((s) => s.setLineBorderMode);
   const setLineCalTest = useSumoStore((s) => s.setLineCalTest);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
@@ -389,7 +392,7 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
           </View>
 
           <View style={styles.fichaHeader}>
-            <Text style={styles.sectionTitleInline}>LINHA 2 PONTOS (PRETO + BRANCO · NVS)</Text>
+            <Text style={styles.sectionTitleInline}>CALIBRAÇÃO DE LINHA (QTR 8S OU 2P · NVS)</Text>
             <View style={styles.calBadgeRow}>
               <View
                 style={[
@@ -416,6 +419,89 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
               </View>
             </View>
           </View>
+
+          {lineSweep?.active ? (
+            <View
+              style={[
+                styles.calAction,
+                {
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  backgroundColor: surface,
+                  borderColor: '#FF4D00',
+                  gap: 8,
+                },
+              ]}
+            >
+              <View style={styles.fichaHeader}>
+                <Text style={[styles.calTitle, { color: '#FF4D00' }]}>
+                  Varrendo Branco ↔ Preto ({(lineSweep.remainingMs / 1000).toFixed(1)}s)
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    Vibration.vibrate(20);
+                    void cancelLineSweep();
+                  }}
+                  style={[styles.miniBtn, { borderColor: divider }]}
+                >
+                  <Text style={styles.miniBtnText}>Cancelar</Text>
+                </Pressable>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: '#27272A', overflow: 'hidden' }}>
+                <View
+                  style={{
+                    height: '100%',
+                    borderRadius: 3,
+                    backgroundColor: '#FF4D00',
+                    width: `${Math.max(
+                      4,
+                      Math.min(
+                        100,
+                        ((lineSweep.durationMs - lineSweep.remainingMs) /
+                          Math.max(1, lineSweep.durationMs)) *
+                          100,
+                      ),
+                    )}%`,
+                  }}
+                />
+              </View>
+              <Text style={styles.calSub}>
+                LE:{' '}
+                {lineSweep.leMin <= lineSweep.leMax
+                  ? `${lineSweep.leMin}..${lineSweep.leMax} (Δ${lineSweep.leMax - lineSweep.leMin})`
+                  : 'passe sobre a faixa'}{' '}
+                · LD:{' '}
+                {lineSweep.ldMin <= lineSweep.ldMax
+                  ? `${lineSweep.ldMin}..${lineSweep.ldMax} (Δ${lineSweep.ldMax - lineSweep.ldMin})`
+                  : 'passe sobre a faixa'}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                Vibration.vibrate(40);
+                setCalFeedback(
+                  'Varredura QTR de 8s iniciada: passe os sensores entre o PRETO e a faixa BRANCA!',
+                );
+                void startLineSweep(8000);
+              }}
+              style={[
+                styles.calAction,
+                {
+                  backgroundColor: 'rgba(255,77,0,0.14)',
+                  borderColor: '#FF4D00',
+                },
+              ]}
+            >
+              <Target color="#FF4D00" size={20} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.calTitle}>Calibrar 8s estilo QTR (Branco ↔ Preto)</Text>
+                <Text style={styles.calSub}>
+                  Passe o robô entre o preto e a linha branca por 8s (igual seguidor de linha)
+                </Text>
+              </View>
+            </Pressable>
+          )}
 
           <View style={styles.calStepRow}>
             <Pressable
@@ -490,11 +576,15 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
               ]}
             >
               <Text style={styles.feedbackText}>
-                {lastLineCalEvent.kind === 'preto'
-                  ? `PRETO salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
-                  : lastLineCalEvent.ok
-                    ? `BRANCO 2P salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} (Δ${lastLineCalEvent.cDir ?? 0}) · LE=${lastLineCalEvent.le} (Δ${lastLineCalEvent.cEsq ?? 0}) → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr} (${lastLineCalEvent.whiteIsLow ? 'B<P' : 'B>P'})`
-                    : `Contraste baixo ao medir BRANCO (ΔLD=${lastLineCalEvent.cDir ?? 0}, ΔLE=${lastLineCalEvent.cEsq ?? 0})! Confirme os 2 sensores sobre a faixa branca e repita.`}
+                {lastLineCalEvent.kind === 'sweep'
+                  ? lastLineCalEvent.ok
+                    ? `QTR 8s salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LE ${lastLineCalEvent.leMin ?? 0}↔${lastLineCalEvent.leMax ?? 0} (Δ${lastLineCalEvent.cEsq ?? 0} → thr ${lastLineCalEvent.leThr}) · LD ${lastLineCalEvent.ldMin ?? 0}↔${lastLineCalEvent.ldMax ?? 0} (Δ${lastLineCalEvent.cDir ?? 0} → thr ${lastLineCalEvent.ldThr})`
+                    : `QTR 8s contraste parcial (ΔLE=${lastLineCalEvent.cEsq ?? 0}, ΔLD=${lastLineCalEvent.cDir ?? 0}) → limiares LE=${lastLineCalEvent.leThr} / LD=${lastLineCalEvent.ldThr}`
+                  : lastLineCalEvent.kind === 'preto'
+                    ? `PRETO salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                    : lastLineCalEvent.ok
+                      ? `BRANCO 2P salvo (${lastLineCalEvent.nvsOk ? 'NVS OK' : 'ERRO NVS'}): LD=${lastLineCalEvent.ld} (Δ${lastLineCalEvent.cDir ?? 0}) · LE=${lastLineCalEvent.le} (Δ${lastLineCalEvent.cEsq ?? 0}) → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr} (${lastLineCalEvent.whiteIsLow ? 'B<P' : 'B>P'})`
+                      : `Contraste baixo ao medir BRANCO (ΔLD=${lastLineCalEvent.cDir ?? 0}, ΔLE=${lastLineCalEvent.cEsq ?? 0})! Confirme os 2 sensores sobre a faixa branca e repita.`}
               </Text>
             </View>
           ) : null}

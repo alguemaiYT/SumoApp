@@ -148,9 +148,12 @@ export default function TuningScreen() {
   const sensorLD = useSumoStore((s) => s.telemetry.sensorLD);
   const sensorLE = useSumoStore((s) => s.telemetry.sensorLE);
   const lastLineCalEvent = useSumoStore((s) => s.lastLineCalEvent);
+  const lineSweep = useSumoStore((s) => s.lineSweep);
   const highContrast = useSumoStore((s) => s.highContrast);
   const saveTuning = useSumoStore((s) => s.saveTuning);
   const setLineBorderMode = useSumoStore((s) => s.setLineBorderMode);
+  const startLineSweep = useSumoStore((s) => s.startLineSweep);
+  const cancelLineSweep = useSumoStore((s) => s.cancelLineSweep);
   const calibrateBlack = useSumoStore((s) => s.calibrateBlack);
   const calibrateWhite = useSumoStore((s) => s.calibrateWhite);
   const resetRobotConfig = useSumoStore((s) => s.resetRobotConfig);
@@ -448,6 +451,68 @@ export default function TuningScreen() {
               </View>
             </View>
 
+            {lineSweep?.active ? (
+              <View style={[styles.sweepCard, { backgroundColor: surface }]}>
+                <View style={styles.sweepTopRow}>
+                  <Text style={styles.sweepTitle}>
+                    Varrendo Branco ↔ Preto ({(lineSweep.remainingMs / 1000).toFixed(1)}s)
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      Vibration.vibrate(20);
+                      void cancelLineSweep();
+                    }}
+                    style={styles.sweepCancelBtn}
+                  >
+                    <Text style={styles.sweepCancelText}>Cancelar</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.sweepBarTrack}>
+                  <View
+                    style={[
+                      styles.sweepBarFill,
+                      {
+                        width: `${Math.max(
+                          4,
+                          Math.min(
+                            100,
+                            ((lineSweep.durationMs - lineSweep.remainingMs) /
+                              Math.max(1, lineSweep.durationMs)) *
+                              100,
+                          ),
+                        )}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.sweepRangeText}>
+                  LE:{' '}
+                  {lineSweep.leMin <= lineSweep.leMax
+                    ? `${lineSweep.leMin}..${lineSweep.leMax} (Δ${lineSweep.leMax - lineSweep.leMin})`
+                    : 'mova sobre a linha'}{' '}
+                  · LD:{' '}
+                  {lineSweep.ldMin <= lineSweep.ldMax
+                    ? `${lineSweep.ldMin}..${lineSweep.ldMax} (Δ${lineSweep.ldMax - lineSweep.ldMin})`
+                    : 'mova sobre a linha'}
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(40);
+                  void startLineSweep(8000);
+                }}
+                style={styles.sweepStartBtn}
+              >
+                <Text style={styles.sweepStartTitle}>
+                  Calibrar 8s estilo QTR (Branco ↔ Preto)
+                </Text>
+                <Text style={styles.sweepStartSub}>
+                  Passe os sensores entre a pista preta e a faixa branca por 8s
+                </Text>
+              </Pressable>
+            )}
+
             <View style={styles.lineCalRow}>
               <Pressable
                 onPress={() => {
@@ -456,7 +521,7 @@ export default function TuningScreen() {
                 }}
                 style={[styles.lineCalBtn, { backgroundColor: surface, borderColor: divider }]}
               >
-                <Text style={styles.lineCalBtnText}>1. Calibrar PRETO</Text>
+                <Text style={styles.lineCalBtnText}>Manual: 1. PRETO</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -467,12 +532,12 @@ export default function TuningScreen() {
                   styles.lineCalBtn,
                   {
                     backgroundColor: surface,
-                    borderColor: lineCalFlags === 3 ? 'rgba(34,197,94,0.5)' : '#FF4D00',
+                    borderColor: lineCalFlags === 3 ? 'rgba(34,197,94,0.5)' : divider,
                   },
                 ]}
               >
                 <Text style={[styles.lineCalBtnText, { color: '#FAFAFA' }]}>
-                  2. Calibrar BRANCO
+                  Manual: 2. BRANCO
                 </Text>
               </Pressable>
             </View>
@@ -487,11 +552,15 @@ export default function TuningScreen() {
                   },
                 ]}
               >
-                {lastLineCalEvent.kind === 'preto'
-                  ? `Preto salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
-                  : lastLineCalEvent.ok
-                    ? `Branco 2P salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
-                    : 'Contraste baixo no branco! Posicione os sensores sobre a faixa branca e repita.'}
+                {lastLineCalEvent.kind === 'sweep'
+                  ? lastLineCalEvent.ok
+                    ? `QTR 8s salvo: LE ${lastLineCalEvent.leMin ?? 0}↔${lastLineCalEvent.leMax ?? 0} (thr ${lastLineCalEvent.leThr}) · LD ${lastLineCalEvent.ldMin ?? 0}↔${lastLineCalEvent.ldMax ?? 0} (thr ${lastLineCalEvent.ldThr})`
+                    : `QTR 8s contraste parcial (ΔLE=${lastLineCalEvent.cEsq ?? 0}, ΔLD=${lastLineCalEvent.cDir ?? 0}) → thr LE=${lastLineCalEvent.leThr} / LD=${lastLineCalEvent.ldThr}`
+                  : lastLineCalEvent.kind === 'preto'
+                    ? `Preto salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                    : lastLineCalEvent.ok
+                      ? `Branco 2P salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                      : 'Contraste baixo no branco! Posicione os sensores sobre a faixa branca e repita.'}
               </Text>
             ) : null}
           </View>
@@ -897,6 +966,74 @@ const styles = StyleSheet.create({
   lineCalHint: {
     fontSize: 11,
     fontFamily: 'monospace',
+  },
+  sweepStartBtn: {
+    backgroundColor: 'rgba(255,77,0,0.14)',
+    borderColor: '#FF4D00',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    gap: 2,
+  },
+  sweepStartTitle: {
+    color: '#FAFAFA',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sweepStartSub: {
+    color: '#D4D4D8',
+    fontSize: 10,
+  },
+  sweepCard: {
+    borderColor: '#FF4D00',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  sweepTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  sweepTitle: {
+    color: '#FF4D00',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  sweepCancelBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  sweepCancelText: {
+    color: '#D4D4D8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  sweepBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#27272A',
+    overflow: 'hidden',
+  },
+  sweepBarFill: {
+    height: '100%',
+    backgroundColor: '#FF4D00',
+    borderRadius: 3,
+  },
+  sweepRangeText: {
+    color: '#FAFAFA',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
   },
   saveBar: {
     flexDirection: 'row',
