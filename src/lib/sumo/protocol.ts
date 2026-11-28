@@ -85,9 +85,9 @@ export const STRATEGIES: StrategyDefinition[] = [
   {
     id: 8,
     name: 'Espera',
-    shortTag: 'STEALTH 10S',
-    description: 'Fica parado analisando, dá um pulso curto de avanço a cada 10s (anti-inatividade) e contra-ataca em 255 PWM ao detectar o oponente.',
-    bestAgainst: 'Chargers agressivos que se expõem na investida',
+    shortTag: 'PULSOS 800MS',
+    description: 'Espreita ativa: fica imóvel por 800ms, avança num pulso reto de 110ms (2–3 cm) e dá o bote em 255 PWM ao detectar o oponente.',
+    bestAgainst: 'Chargers agressivos e robôs que esperam contato',
     dangerLevel: 'balanced',
   },
   {

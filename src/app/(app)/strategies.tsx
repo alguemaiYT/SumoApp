@@ -13,7 +13,7 @@ const SHORT_SUMMARY: Record<StrategyId, string> = {
   5: 'Investida frontal direta',
   6: 'Abertura pelo flanco esquerdo',
   7: 'Teste de borda na pista',
-  8: 'Parado + pulso 10s + ataque',
+  8: 'Espreita 800ms + pulso 110ms + bote 255',
   9: 'Abertura pelo flanco direito',
   10: 'Finta curta + snap direita',
 };
