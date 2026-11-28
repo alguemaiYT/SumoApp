@@ -139,6 +139,7 @@ export default function DashboardScreen() {
             thrLE={info.linhaLimiarEsq}
             thrLD={info.linhaLimiarDir}
             whiteIsLow={info.lineWhiteIsLow}
+            lineMode={info.lineSensorMode}
             headingDeg={info.headingDeg}
             highContrast={highContrast}
           />

@@ -6,6 +6,14 @@ export const BLE_NUS_TX_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 export const DEFAULT_DEVICE_NAME = 'Madinboo_BT';
 
 export type MatchStateCode = 0 | 1 | 2 | 3;
+export type LineBorderMode = 0 | 1 | 2 | 3;
+
+export const LINE_BORDER_MODE_LABELS: Record<LineBorderMode, string> = {
+  0: 'OFF',
+  1: 'SÓ DIR',
+  2: 'SÓ ESQ',
+  3: 'AMBOS',
+};
 
 export const MATCH_STATE_LABELS: Record<MatchStateCode, string> = {
   0: 'PRÉ-PARTIDA (IDLE)',
@@ -198,6 +206,7 @@ export interface RobotInfoData {
   linhaLimiarEsq: number;
   lineWhiteIsLow: boolean;
   lineCalFlags: number;
+  lineSensorMode: LineBorderMode;
   nvsOk: boolean;
   irStartDelayMs: number;
   firmwareBranch: 'debug' | 'exper' | 'unknown';
@@ -270,6 +279,8 @@ export const cmdStrategy = (id: StrategyId): string => `EST,${clampInt(id, 1, 10
 export const cmdStraightSpeed = (pwm: number): string => `VR,${clampInt(pwm, 0, 255)}*`;
 export const cmdTurnSpeed = (pwm: number): string => `VG,${clampInt(pwm, 0, 255)}*`;
 export const cmdHbevasao = (enabled: boolean): string => `HBE,${enabled ? 1 : 0}*`;
+export const cmdLineBorderMode = (mode: LineBorderMode): string =>
+  `LBM,${clampInt(mode, 0, 3)}*`;
 export const cmdStalledThreshold = (val: number): string =>
   `LIP,${Number.isFinite(val) ? Number(val.toFixed(3)) : 0.15}*`;
 export const cmdPushedThreshold = (val: number): string =>
@@ -394,6 +405,10 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
     ? rawRoll
     : Number(((Math.asin(Math.max(-1, Math.min(1, ay / 9.81))) * 180) / Math.PI).toFixed(1));
 
+  const rawLbm = map.lbm !== undefined ? Number.parseInt(map.lbm, 10) : Number.NaN;
+  const lineSensorMode: LineBorderMode =
+    rawLbm === 0 || rawLbm === 1 || rawLbm === 2 || rawLbm === 3 ? rawLbm : 3;
+
   return {
     estrategia: est as StrategyId,
     matchState: state as MatchStateCode,
@@ -409,6 +424,7 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
     linhaLimiarEsq: Number.parseInt(map.leThr ?? '250', 10) || 250,
     lineWhiteIsLow: map.wLow !== undefined ? map.wLow !== '0' : true,
     lineCalFlags: Number.parseInt(map.lCal ?? '0', 10) || 0,
+    lineSensorMode,
     nvsOk: map.nvs !== undefined ? map.nvs !== '0' : true,
     irStartDelayMs: Number.parseInt(map.ird ?? '0', 10) || 0,
     firmwareBranch,

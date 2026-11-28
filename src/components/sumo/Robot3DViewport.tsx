@@ -40,8 +40,12 @@ const WEBVIEW_PUSH_INTERVAL_MS = 80;
 
 function serializeSnapshot(snap: LiveTelemetrySnapshot): string {
   const { telemetry, info, connected } = snap;
-  const leEdge = isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow);
-  const ldEdge = isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow);
+  const leEdge =
+    (info.lineSensorMode & 2) !== 0 &&
+    isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow);
+  const ldEdge =
+    (info.lineSensorMode & 1) !== 0 &&
+    isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow);
   return JSON.stringify({
     connected,
     pitchDeg: info.pitchDeg,

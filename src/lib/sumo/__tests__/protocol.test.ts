@@ -12,6 +12,7 @@ import {
   cmdEmergencyStop,
   cmdHbevasao,
   cmdIrStartDelay,
+  cmdLineBorderMode,
   cmdLineCalTest,
   cmdLineThresholds,
   cmdPushedThreshold,
@@ -55,6 +56,9 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdTurnSpeed(195)).toBe('VG,195*');
     expect(cmdHbevasao(true)).toBe('HBE,1*');
     expect(cmdHbevasao(false)).toBe('HBE,0*');
+    expect(cmdLineBorderMode(0)).toBe('LBM,0*');
+    expect(cmdLineBorderMode(2)).toBe('LBM,2*');
+    expect(cmdLineBorderMode(3)).toBe('LBM,3*');
     expect(cmdStalledThreshold(0.15)).toBe('LIP,0.15*');
     expect(cmdPushedThreshold(-0.25)).toBe('LIE,-0.25*');
     expect(cmdIrStartDelay(0)).toBe('IRD,0*');
@@ -139,6 +143,7 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
       linhaLimiarEsq: 1620,
       lineWhiteIsLow: false,
       lineCalFlags: 3,
+      lineSensorMode: 3,
       nvsOk: true,
       irStartDelayMs: 5000,
       firmwareBranch: 'exper',
@@ -182,7 +187,15 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(legacy?.rollDeg).toBe(0);
     expect(legacy?.lineWhiteIsLow).toBe(true);
     expect(legacy?.lineCalFlags).toBe(0);
+    expect(legacy?.lineSensorMode).toBe(3);
     expect(legacy?.nvsOk).toBe(true);
+
+    const lbmOnlyLeft = parseInfoLine(
+      'INFO|est=8|state=0|imu=1|ax=0.0|ay=0.0|az=9.81|gz=0.0|hdg=0.0|pitch=0.0|roll=0.0|ldThr=800|leThr=850|ird=0|fw=debug|wLow=1|lCal=3|nvs=1|lbm=2',
+      2300,
+    );
+    expect(lbmOnlyLeft?.lineSensorMode).toBe(2);
+    expect(lbmOnlyLeft?.firmwareBranch).toBe('debug');
   });
 
   test('computes realistic 2S LiPo health percentage and alert levels', () => {

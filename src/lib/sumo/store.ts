@@ -9,6 +9,7 @@ import type {
   BenchJogDirection,
   BenchMotorDir,
   BenchMotorSide,
+  LineBorderMode,
   LineCalEvent,
   RobotInfoData,
   StrategyId,
@@ -26,6 +27,7 @@ import {
   cmdEmergencyStop,
   cmdHbevasao,
   cmdIrStartDelay,
+  cmdLineBorderMode,
   cmdLineCalTest,
   cmdPushedThreshold,
   cmdRequestInfo,
@@ -133,6 +135,7 @@ const DEFAULT_INFO: RobotInfoData = {
   linhaLimiarEsq: 250,
   lineWhiteIsLow: true,
   lineCalFlags: 0,
+  lineSensorMode: 3,
   nvsOk: true,
   irStartDelayMs: 0,
   firmwareBranch: 'unknown',
@@ -195,6 +198,7 @@ interface SumoStore {
   calibrateAll: () => Promise<void>;
   calibrateBlack: () => Promise<void>;
   calibrateWhite: () => Promise<void>;
+  setLineBorderMode: (mode: LineBorderMode) => Promise<void>;
   setLineCalTest: (enabled: boolean) => Promise<void>;
   calibrateImu: () => Promise<void>;
   zeroYaw: () => Promise<void>;
@@ -426,6 +430,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         prev.linhaLimiarEsq !== info.linhaLimiarEsq ||
         prev.lineWhiteIsLow !== info.lineWhiteIsLow ||
         prev.lineCalFlags !== info.lineCalFlags ||
+        prev.lineSensorMode !== info.lineSensorMode ||
         prev.nvsOk !== info.nvsOk ||
         prev.irStartDelayMs !== info.irStartDelayMs ||
         prev.firmwareBranch !== info.firmwareBranch;
@@ -471,7 +476,7 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         const simRoll = Number((Math.cos(pollTick / 6) * 7.5).toFixed(1));
         const simAz = Number((9.81 * Math.cos((simPitch * Math.PI) / 180)).toFixed(2));
         handleIncomingLine(
-          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|az=${simAz}|gz=0.3|hdg=${((pollTick * 4) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper|wLow=${inf.lineWhiteIsLow ? 1 : 0}|lCal=${inf.lineCalFlags}|nvs=1`,
+          `INFO|est=${inf.estrategia}|state=${inf.matchState}|imu=1|ax=0.04|ay=-0.02|az=${simAz}|gz=0.3|hdg=${((pollTick * 4) % 360).toFixed(1)}|pitch=${simPitch}|roll=${simRoll}|ldThr=${inf.linhaLimiarDir}|leThr=${inf.linhaLimiarEsq}|ird=${inf.irStartDelayMs}|fw=exper|wLow=${inf.lineWhiteIsLow ? 1 : 0}|lCal=${inf.lineCalFlags}|nvs=1|lbm=${inf.lineSensorMode}`,
         );
         return;
       }
@@ -511,6 +516,13 @@ export const useSumoStore = create<SumoStore>((set, get) => {
         const b = val === '1';
         liveTelemetry = { ...liveTelemetry, HBEvasao: b };
         set((s) => ({ telemetry: { ...s.telemetry, HBEvasao: b } }));
+      } else if (key === 'LBM' && val !== undefined) {
+        const parsed = Number.parseInt(val, 10);
+        const mode: LineBorderMode =
+          parsed === 0 || parsed === 1 || parsed === 2 || parsed === 3 ? parsed : 3;
+        liveInfo = { ...liveInfo, lineSensorMode: mode, nvsOk: true };
+        set((s) => ({ info: { ...s.info, lineSensorMode: mode, nvsOk: true } }));
+        appendLog('rx', `SIM: Proteção de borda branca LBM=${mode} salva na NVS`);
       } else if (key === 'LIP' && val) {
         const f = Number.parseFloat(val);
         liveTelemetry = { ...liveTelemetry, limiarParado: f };
@@ -841,6 +853,12 @@ export const useSumoStore = create<SumoStore>((set, get) => {
 
     calibrateWhite: async () => {
       await sendCmd(cmdCalibrateWhite());
+    },
+
+    setLineBorderMode: async (mode) => {
+      liveInfo = { ...liveInfo, lineSensorMode: mode };
+      set((s) => ({ info: { ...s.info, lineSensorMode: mode } }));
+      await sendCmd(cmdLineBorderMode(mode));
     },
 
     setLineCalTest: async (enabled) => {

@@ -21,7 +21,11 @@ import {
 } from 'react-native';
 
 import { ManualDrivePad } from '@/components/sumo/ManualDrivePad';
-import { isLineEdgeDetected, lipo2sStatus } from '@/lib/sumo/protocol';
+import {
+  isLineEdgeDetected,
+  type LineBorderMode,
+  lipo2sStatus,
+} from '@/lib/sumo/protocol';
 import { type ConsoleEntry, useSumoStore } from '@/lib/sumo/store';
 
 export type BenchTab = 'controle' | 'calibracao' | 'ficha';
@@ -92,6 +96,12 @@ function BenchCalibrationReadouts({
   const sensorLatch = useSumoStore((s) => s.sensorLatch);
   const resetSensorLatch = useSumoStore((s) => s.resetSensorLatch);
   const bat = lipo2sStatus(telemetry.Vbat);
+  const leEnabled = (info.lineSensorMode & 2) !== 0;
+  const ldEnabled = (info.lineSensorMode & 1) !== 0;
+  const leEdge =
+    leEnabled && isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow);
+  const ldEdge =
+    ldEnabled && isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow);
 
   return (
     <>
@@ -162,15 +172,19 @@ function BenchCalibrationReadouts({
           },
           {
             k: 'Linha Esq (LE · 39)',
-            cur: `${telemetry.sensorLE}${isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow) ? ' · BORDA' : ''}`,
-            ref: `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarEsq}`,
-            warn: isLineEdgeDetected(telemetry.sensorLE, info.linhaLimiarEsq, info.lineWhiteIsLow),
+            cur: `${telemetry.sensorLE}${!leEnabled ? ' · OFF' : leEdge ? ' · BORDA' : ''}`,
+            ref: !leEnabled
+              ? 'canal desativado (LBM)'
+              : `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarEsq}`,
+            warn: leEdge,
           },
           {
             k: 'Linha Dir (LD · 26)',
-            cur: `${telemetry.sensorLD}${isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow) ? ' · BORDA' : ''}`,
-            ref: `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarDir}`,
-            warn: isLineEdgeDetected(telemetry.sensorLD, info.linhaLimiarDir, info.lineWhiteIsLow),
+            cur: `${telemetry.sensorLD}${!ldEnabled ? ' · OFF' : ldEdge ? ' · BORDA' : ''}`,
+            ref: !ldEnabled
+              ? 'canal desativado (LBM)'
+              : `limiar ${info.lineWhiteIsLow ? '≤' : '≥'} ${info.linhaLimiarDir}`,
+            warn: ldEdge,
           },
         ].map((row) => (
           <View key={row.k} style={[styles.readoutRow, { borderBottomColor: divider }]}>
@@ -207,6 +221,7 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
   const calibrateAll = useSumoStore((s) => s.calibrateAll);
   const calibrateBlack = useSumoStore((s) => s.calibrateBlack);
   const calibrateWhite = useSumoStore((s) => s.calibrateWhite);
+  const setLineBorderMode = useSumoStore((s) => s.setLineBorderMode);
   const setLineCalTest = useSumoStore((s) => s.setLineCalTest);
   const calibrateImu = useSumoStore((s) => s.calibrateImu);
   const sendRaw = useSumoStore((s) => s.sendRaw);
@@ -340,6 +355,39 @@ export function BenchView({ initialTab = 'controle' }: { initialTab?: BenchTab }
       {/* SUB-TAB 2: CALIBRAÇÃO */}
       {subTab === 'calibracao' ? (
         <ScrollView style={styles.flex1} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitleInline}>PROTEÇÃO DE BORDA EM COMBATE (LBM · NVS)</Text>
+          <View style={[styles.segTrack, { backgroundColor: surface, borderColor: divider }]}>
+            {(
+              [
+                { mode: 0 as LineBorderMode, label: 'OFF' },
+                { mode: 3 as LineBorderMode, label: 'AMBOS' },
+                { mode: 2 as LineBorderMode, label: 'SÓ ESQ' },
+                { mode: 1 as LineBorderMode, label: 'SÓ DIR' },
+              ] as const
+            ).map((opt) => {
+              const active = info.lineSensorMode === opt.mode;
+              return (
+                <Pressable
+                  key={opt.mode}
+                  onPress={() => {
+                    Vibration.vibrate(25);
+                    void setLineBorderMode(opt.mode);
+                  }}
+                  style={[
+                    styles.segBtn,
+                    active && {
+                      backgroundColor: opt.mode === 0 ? 'rgba(239,68,68,0.22)' : '#FF4D00',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.segBtnText, active && styles.segBtnTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <View style={styles.fichaHeader}>
             <Text style={styles.sectionTitleInline}>LINHA 2 PONTOS (PRETO + BRANCO · NVS)</Text>
             <View style={styles.calBadgeRow}>

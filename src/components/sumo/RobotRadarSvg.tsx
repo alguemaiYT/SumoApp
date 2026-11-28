@@ -2,7 +2,7 @@ import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
-import { isLineEdgeDetected } from '@/lib/sumo/protocol';
+import { isLineEdgeDetected, type LineBorderMode } from '@/lib/sumo/protocol';
 
 interface RobotRadarProps {
   senEsq: number;
@@ -14,6 +14,7 @@ interface RobotRadarProps {
   thrLE: number;
   thrLD: number;
   whiteIsLow?: boolean;
+  lineMode?: LineBorderMode;
   headingDeg?: number;
   highContrast?: boolean;
 }
@@ -28,6 +29,7 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
   thrLE,
   thrLD,
   whiteIsLow = true,
+  lineMode = 3,
   headingDeg = 0,
   highContrast = false,
 }: RobotRadarProps) {
@@ -36,8 +38,10 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
   const scdOn = senCentroDir === 1;
   const sdOn = senDir === 1;
 
-  const leEdge = isLineEdgeDetected(sensorLE, thrLE, whiteIsLow);
-  const ldEdge = isLineEdgeDetected(sensorLD, thrLD, whiteIsLow);
+  const leEnabled = (lineMode & 2) !== 0;
+  const ldEnabled = (lineMode & 1) !== 0;
+  const leEdge = leEnabled && isLineEdgeDetected(sensorLE, thrLE, whiteIsLow);
+  const ldEdge = ldEnabled && isLineEdgeDetected(sensorLD, thrLD, whiteIsLow);
   const thrOp = whiteIsLow ? '≤' : '≥';
 
   // Heading needle inside chassis (+headingDeg = CCW/left, -headingDeg = CW/right)
@@ -217,8 +221,17 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
           <View style={styles.lineHeadRow}>
             <Text style={styles.lineTag}>LINHA ESQ</Text>
             <View style={[styles.badge, leEdge ? styles.badgeEdge : styles.badgeTrack]}>
-              <Text style={[styles.badgeText, leEdge ? styles.badgeTextEdge : styles.badgeTextTrack]}>
-                {leEdge ? 'BORDA' : 'PISTA'}
+              <Text
+                style={[
+                  styles.badgeText,
+                  !leEnabled
+                    ? { color: '#71717A' }
+                    : leEdge
+                      ? styles.badgeTextEdge
+                      : styles.badgeTextTrack,
+                ]}
+              >
+                {!leEnabled ? 'OFF' : leEdge ? 'BORDA' : 'PISTA'}
               </Text>
             </View>
           </View>
@@ -234,8 +247,17 @@ export const RobotRadarSvg = React.memo(function RobotRadarSvg({
           <View style={styles.lineHeadRow}>
             <Text style={styles.lineTag}>LINHA DIR</Text>
             <View style={[styles.badge, ldEdge ? styles.badgeEdge : styles.badgeTrack]}>
-              <Text style={[styles.badgeText, ldEdge ? styles.badgeTextEdge : styles.badgeTextTrack]}>
-                {ldEdge ? 'BORDA' : 'PISTA'}
+              <Text
+                style={[
+                  styles.badgeText,
+                  !ldEnabled
+                    ? { color: '#71717A' }
+                    : ldEdge
+                      ? styles.badgeTextEdge
+                      : styles.badgeTextTrack,
+                ]}
+              >
+                {!ldEnabled ? 'OFF' : ldEdge ? 'BORDA' : 'PISTA'}
               </Text>
             </View>
           </View>

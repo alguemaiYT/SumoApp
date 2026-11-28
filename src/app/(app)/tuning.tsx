@@ -13,7 +13,12 @@ import {
 } from 'react-native';
 
 import { DynamicSlider } from '@/components/sumo/DynamicSlider';
-import { TOURNAMENT_PRESETS, type TournamentPreset } from '@/lib/sumo/protocol';
+import {
+  isLineEdgeDetected,
+  type LineBorderMode,
+  TOURNAMENT_PRESETS,
+  type TournamentPreset,
+} from '@/lib/sumo/protocol';
 import { useSumoStore } from '@/lib/sumo/store';
 
 function ParamRow({
@@ -134,10 +139,42 @@ export default function TuningScreen() {
   const savedLimiarParado = useSumoStore((s) => s.telemetry.limiarParado);
   const savedLimiarEmpurrado = useSumoStore((s) => s.telemetry.limiarEmpurrado);
   const irStartDelayMs = useSumoStore((s) => s.info.irStartDelayMs);
+  const lineSensorMode = useSumoStore((s) => s.info.lineSensorMode);
+  const linhaLimiarDir = useSumoStore((s) => s.info.linhaLimiarDir);
+  const linhaLimiarEsq = useSumoStore((s) => s.info.linhaLimiarEsq);
+  const lineWhiteIsLow = useSumoStore((s) => s.info.lineWhiteIsLow);
+  const lineCalFlags = useSumoStore((s) => s.info.lineCalFlags);
   const nvsOk = useSumoStore((s) => s.info.nvsOk);
+  const sensorLD = useSumoStore((s) => s.telemetry.sensorLD);
+  const sensorLE = useSumoStore((s) => s.telemetry.sensorLE);
+  const lastLineCalEvent = useSumoStore((s) => s.lastLineCalEvent);
   const highContrast = useSumoStore((s) => s.highContrast);
   const saveTuning = useSumoStore((s) => s.saveTuning);
+  const setLineBorderMode = useSumoStore((s) => s.setLineBorderMode);
+  const calibrateBlack = useSumoStore((s) => s.calibrateBlack);
+  const calibrateWhite = useSumoStore((s) => s.calibrateWhite);
   const resetRobotConfig = useSumoStore((s) => s.resetRobotConfig);
+
+  const lastNonZeroModeRef = React.useRef<Exclude<LineBorderMode, 0>>(3);
+  React.useEffect(() => {
+    if (lineSensorMode !== 0) {
+      lastNonZeroModeRef.current = lineSensorMode;
+    }
+  }, [lineSensorMode]);
+
+  const applyLineMode = (mode: LineBorderMode) => {
+    Vibration.vibrate(25);
+    if (mode !== 0) {
+      lastNonZeroModeRef.current = mode;
+    }
+    void setLineBorderMode(mode);
+  };
+
+  const leEnabled = (lineSensorMode & 2) !== 0;
+  const ldEnabled = (lineSensorMode & 1) !== 0;
+  const leEdge = leEnabled && isLineEdgeDetected(sensorLE, linhaLimiarEsq, lineWhiteIsLow);
+  const ldEdge = ldEnabled && isLineEdgeDetected(sensorLD, linhaLimiarDir, lineWhiteIsLow);
+  const thrOp = lineWhiteIsLow ? '≤' : '≥';
 
   const [velocreta, setVelocreta] = React.useState(savedVelocreta);
   const [velocgiro, setVelocgiro] = React.useState(savedVelocgiro);
@@ -309,7 +346,158 @@ export default function TuningScreen() {
           />
         </View>
 
-        {/* Group 2: IMU & EVASÃO */}
+        {/* Group 2: BORDA BRANCA (SENSOR DE LINHA) */}
+        <Text style={styles.sectionTitle}>BORDA BRANCA (SENSOR DE LINHA)</Text>
+        <View style={[styles.groupBlock, { borderTopColor: divider }]}>
+          <View style={[styles.switchRow, { borderBottomColor: divider }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <View style={styles.paramLabelWrap}>
+                <Text style={styles.paramLabel}>Evasão por Borda Branca</Text>
+                <Text style={styles.paramCode}>LBM</Text>
+              </View>
+              <Text style={styles.switchSub}>
+                Recua na faixa branca · auto-isola em 1.2s se sensor travar (salva na NVS)
+              </Text>
+            </View>
+            <Switch
+              value={lineSensorMode !== 0}
+              onValueChange={(on) => applyLineMode(on ? lastNonZeroModeRef.current : 0)}
+              trackColor={{ false: '#27272A', true: '#FF4D00' }}
+              thumbColor="#FAFAFA"
+            />
+          </View>
+
+          <View style={[styles.linePanel, { borderBottomColor: divider }]}>
+            <View style={styles.lineModeRow}>
+              {(
+                [
+                  { mode: 0 as LineBorderMode, label: 'OFF' },
+                  { mode: 3 as LineBorderMode, label: 'AMBOS' },
+                  { mode: 2 as LineBorderMode, label: 'SÓ ESQ' },
+                  { mode: 1 as LineBorderMode, label: 'SÓ DIR' },
+                ] as const
+              ).map((opt) => {
+                const active = lineSensorMode === opt.mode;
+                const isOff = opt.mode === 0;
+                return (
+                  <Pressable
+                    key={opt.mode}
+                    onPress={() => applyLineMode(opt.mode)}
+                    style={[
+                      styles.lineModePill,
+                      {
+                        backgroundColor: active
+                          ? isOff
+                            ? 'rgba(239,68,68,0.16)'
+                            : 'rgba(255,77,0,0.16)'
+                          : surface,
+                        borderColor: active ? (isOff ? '#EF4444' : '#FF4D00') : divider,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.lineModePillText,
+                        active && { color: isOff ? '#FCA5A5' : '#FF4D00' },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={[styles.lineLiveStrip, { backgroundColor: surface, borderColor: divider }]}>
+              <View style={styles.lineLiveCell}>
+                <Text style={styles.lineLiveLabel}>LE · 39</Text>
+                <Text style={[styles.lineLiveVal, !leEnabled && { color: '#71717A' }]}>
+                  {sensorLE}
+                </Text>
+                <Text
+                  style={[
+                    styles.lineLiveBadge,
+                    !leEnabled
+                      ? { color: '#71717A' }
+                      : leEdge
+                        ? { color: '#F59E0B' }
+                        : { color: '#22C55E' },
+                  ]}
+                >
+                  {!leEnabled ? 'OFF' : leEdge ? 'BORDA' : `PISTA (${thrOp}${linhaLimiarEsq})`}
+                </Text>
+              </View>
+              <View style={[styles.lineLiveDivider, { backgroundColor: divider }]} />
+              <View style={styles.lineLiveCell}>
+                <Text style={styles.lineLiveLabel}>LD · 26</Text>
+                <Text style={[styles.lineLiveVal, !ldEnabled && { color: '#71717A' }]}>
+                  {sensorLD}
+                </Text>
+                <Text
+                  style={[
+                    styles.lineLiveBadge,
+                    !ldEnabled
+                      ? { color: '#71717A' }
+                      : ldEdge
+                        ? { color: '#F59E0B' }
+                        : { color: '#22C55E' },
+                  ]}
+                >
+                  {!ldEnabled ? 'OFF' : ldEdge ? 'BORDA' : `PISTA (${thrOp}${linhaLimiarDir})`}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.lineCalRow}>
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(35);
+                  void calibrateBlack();
+                }}
+                style={[styles.lineCalBtn, { backgroundColor: surface, borderColor: divider }]}
+              >
+                <Text style={styles.lineCalBtnText}>1. Calibrar PRETO</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Vibration.vibrate(35);
+                  void calibrateWhite();
+                }}
+                style={[
+                  styles.lineCalBtn,
+                  {
+                    backgroundColor: surface,
+                    borderColor: lineCalFlags === 3 ? 'rgba(34,197,94,0.5)' : '#FF4D00',
+                  },
+                ]}
+              >
+                <Text style={[styles.lineCalBtnText, { color: '#FAFAFA' }]}>
+                  2. Calibrar BRANCO
+                </Text>
+              </Pressable>
+            </View>
+
+            {lastLineCalEvent ? (
+              <Text
+                style={[
+                  styles.lineCalHint,
+                  {
+                    color:
+                      lastLineCalEvent.ok && lastLineCalEvent.nvsOk ? '#22C55E' : '#F59E0B',
+                  },
+                ]}
+              >
+                {lastLineCalEvent.kind === 'preto'
+                  ? `Preto salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                  : lastLineCalEvent.ok
+                    ? `Branco 2P salvo: LD=${lastLineCalEvent.ld} · LE=${lastLineCalEvent.le} → limiares ${lastLineCalEvent.ldThr}/${lastLineCalEvent.leThr}`
+                    : 'Contraste baixo no branco! Posicione os sensores sobre a faixa branca e repita.'}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Group 3: IMU & EVASÃO */}
         <Text style={styles.sectionTitle}>IMU & EVASÃO</Text>
         <View style={[styles.groupBlock, { borderTopColor: divider }]}>
           <View style={[styles.switchRow, { borderBottomColor: divider }]}>
@@ -627,6 +815,88 @@ const styles = StyleSheet.create({
     color: '#9A9AA6',
     fontSize: 11,
     marginTop: 2,
+  },
+  linePanel: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  lineModeRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  lineModePill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  lineModePillText: {
+    color: '#D4D4D8',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  lineLiveStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  lineLiveCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  lineLiveDivider: {
+    width: 1,
+    height: 18,
+    marginHorizontal: 8,
+  },
+  lineLiveLabel: {
+    color: '#9A9AA6',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  lineLiveVal: {
+    color: '#FAFAFA',
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    fontVariant: ['tabular-nums'],
+  },
+  lineLiveBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  lineCalRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  lineCalBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  lineCalBtnText: {
+    color: '#D4D4D8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lineCalHint: {
+    fontSize: 11,
+    fontFamily: 'monospace',
   },
   saveBar: {
     flexDirection: 'row',
