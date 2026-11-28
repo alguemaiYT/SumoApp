@@ -14,7 +14,7 @@ export const MATCH_STATE_LABELS: Record<MatchStateCode, string> = {
   3: 'PARADA (STOP)',
 };
 
-export type StrategyId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type StrategyId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export interface StrategyDefinition {
   id: StrategyId;
@@ -44,9 +44,9 @@ export const STRATEGIES: StrategyDefinition[] = [
   },
   {
     id: 3,
-    name: 'Firula',
-    shortTag: 'FINTA / COUNTER',
-    description: 'Finta curta inicial para induzir overshoot de chargers retos e contra-atacar o flanco.',
+    name: 'Firula Esq',
+    shortTag: 'FINTA ← ESQ',
+    description: 'Finta curta inicial recuando à esquerda para induzir overshoot de chargers e contra-atacar o flanco.',
     bestAgainst: 'Chargers frontais muito rápidos',
     dangerLevel: 'aggressive',
   },
@@ -68,9 +68,9 @@ export const STRATEGIES: StrategyDefinition[] = [
   },
   {
     id: 6,
-    name: 'Contorno',
-    shortTag: 'FLANCO ARCO',
-    description: 'Abertura em curva assimétrica para escapar do choque frontal e atingir lateral/traseira.',
+    name: 'Contorno Esq',
+    shortTag: 'FLANCO ← ESQ',
+    description: 'Abertura em curva pelo flanco esquerdo com giro interno à direita para atingir lateral/traseira.',
     bestAgainst: 'Robôs mais pesados ou com rampa frontal forte',
     dangerLevel: 'balanced',
   },
@@ -81,6 +81,30 @@ export const STRATEGIES: StrategyDefinition[] = [
     description: 'Modo seguro de bancada/dohyō para validar sensores LD/LE seguindo a borda sem cair.',
     bestAgainst: 'Teste de sensores de borda (não usar em luta)',
     dangerLevel: 'safe',
+  },
+  {
+    id: 8,
+    name: 'Espera',
+    shortTag: 'STEALTH 10S',
+    description: 'Fica parado analisando, dá um pulso curto de avanço a cada 10s (anti-inatividade) e contra-ataca em 255 PWM ao detectar o oponente.',
+    bestAgainst: 'Chargers agressivos que se expõem na investida',
+    dangerLevel: 'balanced',
+  },
+  {
+    id: 9,
+    name: 'Contorno Dir',
+    shortTag: 'FLANCO → DIR',
+    description: 'Espelho do Contorno Esq: abertura em curva pelo flanco direito com giro interno à esquerda.',
+    bestAgainst: 'Robôs pesados ou que abrem pela esquerda',
+    dangerLevel: 'balanced',
+  },
+  {
+    id: 10,
+    name: 'Firula Dir',
+    shortTag: 'FINTA → DIR',
+    description: 'Espelho da Firula Esq: finta curta inicial à direita e snap rápido no flanco direito.',
+    bestAgainst: 'Chargers frontais ou que desviam à direita',
+    dangerLevel: 'aggressive',
   },
 ];
 
@@ -216,7 +240,7 @@ export function clampInt(val: number, min: number, max: number): number {
 }
 
 // Command builders (note: NO wireless match-start command — official autonomous sumo rule!)
-export const cmdStrategy = (id: StrategyId): string => `EST,${clampInt(id, 1, 7)}*`;
+export const cmdStrategy = (id: StrategyId): string => `EST,${clampInt(id, 1, 10)}*`;
 export const cmdStraightSpeed = (pwm: number): string => `VR,${clampInt(pwm, 0, 255)}*`;
 export const cmdTurnSpeed = (pwm: number): string => `VG,${clampInt(pwm, 0, 255)}*`;
 export const cmdHbevasao = (enabled: boolean): string => `HBE,${enabled ? 1 : 0}*`;
@@ -306,7 +330,7 @@ export function parseInfoLine(raw: string, now = Date.now()): RobotInfoData | nu
 
   const est = Number.parseInt(map.est ?? '', 10);
   const state = Number.parseInt(map.state ?? '', 10);
-  if (!Number.isFinite(est) || est < 1 || est > 7) return null;
+  if (!Number.isFinite(est) || est < 1 || est > 10) return null;
   if (!Number.isFinite(state) || state < 0 || state > 3) return null;
 
   const fwRaw = map.fw ?? '';

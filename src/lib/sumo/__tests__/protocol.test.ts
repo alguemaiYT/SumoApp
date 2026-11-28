@@ -69,8 +69,15 @@ describe('SumoApp BLE NUS Base64 & Protocol', () => {
     expect(cmdBenchMotor('D', 0)).toBe('MOT_D,0*');
   });
 
-  test('defines all 7 strategies aligned with firmware EST,1..7*', () => {
-    expect(STRATEGIES.map((s) => s.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  test('defines all 10 strategies aligned with firmware EST,1..10*', () => {
+    expect(STRATEGIES.map((s) => s.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(cmdStrategy(8)).toBe('EST,8*');
+    expect(cmdStrategy(10)).toBe('EST,10*');
+    const info10 = parseInfoLine(
+      'INFO|est=10|state=0|imu=1|ax=0.00|ay=0.00|az=9.81|gz=0.0|hdg=0.0|pitch=0.0|roll=0.0|ldThr=250|leThr=250|ird=0|fw=exper',
+      3000,
+    );
+    expect(info10?.estrategia).toBe(10);
   });
 
   test('parses 12-field pipe-separated dados* line accurately', () => {

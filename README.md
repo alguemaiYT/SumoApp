@@ -2,9 +2,9 @@
 
 Aplicativo móvel oficial para configuração pré-partida, telemetria em tempo real, visualização 3D offline de atitude, controle manual 360° e diagnóstico de bancada do robô **`Sumo_Auto_ESP32`** (Mini-Sumô 500g · ESP32-WROOM-32).
 
-- **Release estável atual (`v10.2.0`):** https://github.com/alguemaiYT/SumoApp/releases/tag/v10.2.0
+- **Release estável atual (`v10.3.0`):** https://github.com/alguemaiYT/SumoApp/releases/tag/v10.3.0
 - **Download direto do APK Android (`latest-apk`):** https://github.com/alguemaiYT/SumoApp/releases/download/latest-apk/SumoApp-android.apk
-- **Firmware compatível (`v2.1.2`):** [`alguemaiYT/Sumo_Auto_ESP32`](https://github.com/alguemaiYT/Sumo_Auto_ESP32) (`debug` / `exper`)
+- **Firmware compatível (`v2.2.0`):** [`alguemaiYT/Sumo_Auto_ESP32`](https://github.com/alguemaiYT/Sumo_Auto_ESP32) (`debug` / `exper`)
 
 ## Conexão Automática Android & iOS (BLE NUS)
 O firmware `Sumo_Auto_ESP32` utiliza **Bluetooth Low Energy (BLE)** nativo do ESP32-WROOM-32 com `NimBLE-Arduino@2.5.2` expondo o **Nordic UART Service (NUS)**:
@@ -13,7 +13,7 @@ O firmware `Sumo_Auto_ESP32` utiliza **Bluetooth Low Energy (BLE)** nativo do ES
 - **RX (App → ESP32):** `6E400002-B5A3-F393-E0A9-E50E24DCCA9E`
 - **TX (ESP32 → App, Notify):** `6E400003-B5A3-F393-E0A9-E50E24DCCA9E`
 
-## Funcionalidades (`v10.2.0`)
+## Funcionalidades (`v10.3.0`)
 1. **Identidade DragonBotz & Navegação Fluida:**
    - **Splash Screen animada** e ícones adaptativos com a logo oficial **DragonBotz Robotics** (fundo carbono `#09090B`) + assinatura minimalista no Painel e no menu BLE.
    - **Swipe lateral entre abas** (`Painel` ↔ `Estratégias` ↔ `Ajustes` ↔ `Bancada`, `animation: 'shift'`) com trava inteligente automática (`gesture-lock.ts`) ao arrastar sliders, usar o joystick ou girar o modelo 3D.
@@ -24,7 +24,7 @@ O firmware `Sumo_Auto_ESP32` utiliza **Bluetooth Low Energy (BLE)** nativo do ES
      - **3D Offline (`Mini-Sumo 500g`):** modelo 3D procedural em Three.js r160 100% embutido sem CDN (`react-native-webview`), cones dos 4 sensores IR acesos ao vivo, anel do dohyō reagindo à borda branca, **gráfico osciloscópio X/Y/Z no fundo** (`XYZ°` ou `m/s²`), estilos (`Téc`, `HUD`, `Cel`), câmeras (`3/4`, `Frente`, `Lat`, `Topo`), streaming intercalado (`STREAM,1*`) e retorno suave para **pose neutra (`OFFLINE · POSE NEUTRA`)** ao desligar o robô.
    - **Telemetria IMU em Graus:** seletor **`GRAUS | m/s²`**, botão **`0° Yaw` / `Frente` (Tare / `ZERO_YAW*`)** e toggle **`Vibrar IR`**.
    - **Barra Global Fixa:** pílula BLE minimalista, saúde da bateria **LiPo 2S** (`V`, `V/cél`, `%` e alertas `< 7.4V` / `< 7.1V`) e botão global **`STOP`** (`PARADA*`).
-3. **Estratégias:** grade tática 2×3 (`01` a `06`), `07 Segue Linha`, card de detalhe tático e seletor **Início IR** (`0s · Juiz` vs `+5s · Interno`, `IRD`) com confirmação + badge `EEPROM OK`.
+3. **Estratégias (`01` a `10`):** grade tática pareada 2×4 (`01 Radar`, `02 Caçador`, `03 Firula Esq` / `10 Firula Dir`, `04 Suicida`, `05 Só Vai`, `06 Contorno Esq` / `09 Contorno Dir`), card full-width **`08 Espera` (Stealth + pulso 10s + contra-ataque)**, **`07 Segue Linha`** (calibração), card de detalhe tático e seletor **Início IR** (`0s · Juiz` vs `+5s · Interno`, `IRD`) com confirmação + badge `EEPROM OK`.
 4. **Ajustes & Perfis:** 4 perfis rápidos de competição, **sliders dinâmicos arrastáveis (`DynamicSlider`)** com feedback háptico (`VR`, `VG`, `LIP`, `LIE`), barra fixa `Salvar na EEPROM` com estado *dirty* e `Resetar` (`RESET_CFG*`).
 5. **Bancada (Controle, Calibração & Ficha Técnica):**
    - **Controle Manual Avançado (`ManualDrivePad`):**

@@ -8,12 +8,19 @@ import { useSumoStore } from '@/lib/sumo/store';
 const SHORT_SUMMARY: Record<StrategyId, string> = {
   1: 'Varredura ativa + 16 estados',
   2: 'Avanço S-curve pelo centro',
-  3: 'Finta curta + contra-flanco',
+  3: 'Finta curta + snap esquerda',
   4: 'Largada plena 255 PWM',
   5: 'Investida frontal direta',
-  6: 'Abertura de flanco lateral',
+  6: 'Abertura pelo flanco esquerdo',
   7: 'Teste de borda na pista',
+  8: 'Parado + pulso 10s + ataque',
+  9: 'Abertura pelo flanco direito',
+  10: 'Finta curta + snap direita',
 };
+
+function fmtStrategyCode(id: StrategyId): string {
+  return String(id).padStart(2, '0');
+}
 
 export default function StrategiesScreen() {
   const estrategia = useSumoStore((s) => s.info.estrategia);
@@ -75,8 +82,12 @@ export default function StrategiesScreen() {
   const surface = highContrast ? '#111114' : '#121215';
   const border = highContrast ? '#3F3F46' : 'rgba(255,255,255,0.09)';
 
-  const mainGrid = STRATEGIES.slice(0, 6);
-  const lineStrategy = STRATEGIES[6];
+  const PAIRED_IDS: StrategyId[] = [1, 2, 3, 10, 4, 5, 6, 9];
+  const mainGrid = PAIRED_IDS.map((id) => STRATEGIES.find((s) => s.id === id)).filter(
+    (s): s is (typeof STRATEGIES)[number] => Boolean(s),
+  );
+  const waitStrategy = STRATEGIES.find((s) => s.id === 8);
+  const lineStrategy = STRATEGIES.find((s) => s.id === 7);
   const activeStrat = STRATEGIES.find((s) => s.id === estrategia) ?? STRATEGIES[0];
 
   return (
@@ -144,7 +155,7 @@ export default function StrategiesScreen() {
               >
                 <View style={styles.tileTop}>
                   <Text style={[styles.tileIndex, selected && { color: '#FF4D00' }]}>
-                    0{st.id}
+                    {fmtStrategyCode(st.id)}
                   </Text>
                   {selected ? (
                     <View style={styles.activePill}>
@@ -164,6 +175,43 @@ export default function StrategiesScreen() {
             );
           })}
         </View>
+
+        {/* Full-width Stealth Wait & Counter Strategy 08 */}
+        {waitStrategy ? (
+          <Pressable
+            onPress={() => handleSelectStrategy(waitStrategy.id)}
+            style={[
+              styles.rowTile,
+              {
+                backgroundColor:
+                  estrategia === waitStrategy.id ? 'rgba(255, 77, 0, 0.11)' : surface,
+                borderColor: estrategia === waitStrategy.id ? '#FF4D00' : border,
+              },
+            ]}
+          >
+            <View style={styles.rowTileLeft}>
+              <Text
+                style={[
+                  styles.tileIndex,
+                  estrategia === waitStrategy.id && { color: '#FF4D00' },
+                ]}
+              >
+                08
+              </Text>
+              <View>
+                <Text style={styles.tileName}>{waitStrategy.name}</Text>
+                <Text style={styles.tileSummary}>{SHORT_SUMMARY[8]}</Text>
+              </View>
+            </View>
+            {estrategia === waitStrategy.id ? (
+              <View style={styles.activePill}>
+                <Text style={styles.activePillText}>ATIVO</Text>
+              </View>
+            ) : (
+              <Text style={styles.tileTag}>{waitStrategy.shortTag}</Text>
+            )}
+          </Pressable>
+        ) : null}
 
         {/* Visually Separated Test / Calibration Strategy 07 */}
         <Text style={styles.sectionMicro}>TESTE / CALIBRAÇÃO</Text>
@@ -208,7 +256,7 @@ export default function StrategiesScreen() {
           <View style={styles.tacticalAccent} />
           <View style={styles.tacticalBody}>
             <Text style={styles.hintLabel}>
-              0{activeStrat.id} {activeStrat.name.toUpperCase()} · IDEAL CONTRA
+              {fmtStrategyCode(activeStrat.id)} {activeStrat.name.toUpperCase()} · IDEAL CONTRA
             </Text>
             <Text style={styles.hintPrimary}>{activeStrat.bestAgainst}</Text>
             <Text style={styles.hintDesc} numberOfLines={2}>
